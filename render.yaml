@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: laboris-api
+    runtime: docker
+    repo: https://github.com/JuanManuelVallejos/laboris-api
+    branch: main
+    envVars:
+      - key: PORT
+        value: 8080
+      - key: GIN_MODE
+        value: release
