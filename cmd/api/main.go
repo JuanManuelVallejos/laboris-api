@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 
+	"github.com/clerk/clerk-sdk-go/v2"
 	"github.com/laboris/laboris-api/config"
 	"github.com/laboris/laboris-api/internal/db"
 	"github.com/laboris/laboris-api/internal/handler"
@@ -14,6 +15,8 @@ import (
 
 func main() {
 	cfg := config.Load()
+
+	clerk.SetKey(cfg.ClerkSecretKey)
 
 	var ph *handler.ProfessionalHandler
 	var oh *handler.OnboardingHandler
