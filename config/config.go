@@ -7,7 +7,8 @@ import (
 )
 
 type Config struct {
-	Port string
+	Port           string
+	ClerkSecretKey string
 }
 
 func Load() *Config {
@@ -18,5 +19,8 @@ func Load() *Config {
 		port = "8080"
 	}
 
-	return &Config{Port: port}
+	return &Config{
+		Port:           port,
+		ClerkSecretKey: os.Getenv("CLERK_SECRET_KEY"),
+	}
 }

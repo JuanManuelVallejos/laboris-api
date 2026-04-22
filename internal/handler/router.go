@@ -1,17 +1,26 @@
 package handler
 
-import "github.com/gin-gonic/gin"
+import (
+	"github.com/gin-gonic/gin"
+)
 
 func NewRouter(ph *ProfessionalHandler) *gin.Engine {
 	r := gin.Default()
 
 	r.GET("/ping", Ping)
 
-	v1 := r.Group("/api/v1")
+	// Rutas públicas
+	pub := r.Group("/api/v1")
 	{
-		v1.GET("/professionals", ph.GetAll)
-		v1.GET("/professionals/:id", ph.GetByID)
+		pub.GET("/professionals", ph.GetAll)
+		pub.GET("/professionals/:id", ph.GetByID)
 	}
+
+	// Rutas protegidas se agregan en el próximo paso (POST /requests, etc.)
+	// Ejemplo:
+	// priv := r.Group("/api/v1")
+	// priv.Use(middleware.ClerkAuth())
+	// priv.POST("/requests", rh.Create)
 
 	return r
 }
