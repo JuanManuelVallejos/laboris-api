@@ -63,6 +63,7 @@ func (r *ProfessionalRepository) FindByID(id string) (*domain.Professional, erro
 func (r *ProfessionalRepository) Create(p *domain.Professional) (*domain.Professional, error) {
 	err := r.db.QueryRow(context.Background(),
 		`INSERT INTO professionals (user_id, trade, zone, bio) VALUES ($1, $2, $3, $4)
+		 ON CONFLICT (user_id) DO UPDATE SET trade = EXCLUDED.trade, zone = EXCLUDED.zone, bio = EXCLUDED.bio
 		 RETURNING id, user_id, trade, zone, bio, verified`,
 		p.UserID, p.Trade, p.Zone, p.Bio,
 	).Scan(&p.ID, &p.UserID, &p.Trade, &p.Zone, &p.Bio, &p.Verified)
