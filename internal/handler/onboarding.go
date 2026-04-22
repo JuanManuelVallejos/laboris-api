@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"log"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -48,7 +49,8 @@ func (h *OnboardingHandler) Complete(c *gin.Context) {
 		Bio:      req.Bio,
 	})
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "onboarding failed"})
+		log.Printf("onboarding error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
