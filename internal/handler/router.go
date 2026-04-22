@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"net/http"
+
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/laboris/laboris-api/internal/middleware"
@@ -15,6 +17,11 @@ func NewRouter(ph *ProfessionalHandler, oh *OnboardingHandler) *gin.Engine {
 		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
 		AllowCredentials: true,
 	}))
+
+	// Responde a todos los preflight OPTIONS
+	r.OPTIONS("/*path", func(c *gin.Context) {
+		c.Status(http.StatusNoContent)
+	})
 
 	r.GET("/ping", Ping)
 
