@@ -25,13 +25,24 @@ func NewPool(ctx context.Context, databaseURL string) (*pgxpool.Pool, error) {
 	return pool, nil
 }
 
+// migrateURL converts postgresql:// → pgx5:// as required by golang-migrate's pgx/v5 driver.
+func migrateURL(databaseURL string) string {
+	if len(databaseURL) >= 13 && databaseURL[:13] == "postgresql://" {
+		return "pgx5://" + databaseURL[13:]
+	}
+	if len(databaseURL) >= 9 && databaseURL[:9] == "postgres://" {
+		return "pgx5://" + databaseURL[9:]
+	}
+	return databaseURL
+}
+
 func RunMigrations(databaseURL string) error {
 	src, err := iofs.New(migrationsFS, "migrations")
 	if err != nil {
 		return fmt.Errorf("iofs.New: %w", err)
 	}
 
-	m, err := migrate.NewWithSourceInstance("iofs", src, databaseURL)
+	m, err := migrate.NewWithSourceInstance("iofs", src, migrateURL(databaseURL))
 	if err != nil {
 		return fmt.Errorf("migrate.New: %w", err)
 	}
