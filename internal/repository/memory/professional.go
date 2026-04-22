@@ -32,3 +32,8 @@ func (r *professionalRepository) FindByID(id string) (*domain.Professional, erro
 	}
 	return nil, errors.New("professional not found")
 }
+
+func (r *professionalRepository) Create(p *domain.Professional) (*domain.Professional, error) {
+	r.data = append(r.data, *p)
+	return p, nil
+}

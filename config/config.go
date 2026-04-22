@@ -9,6 +9,7 @@ import (
 type Config struct {
 	Port           string
 	ClerkSecretKey string
+	DatabaseURL    string
 }
 
 func Load() *Config {
@@ -22,5 +23,6 @@ func Load() *Config {
 	return &Config{
 		Port:           port,
 		ClerkSecretKey: os.Getenv("CLERK_SECRET_KEY"),
+		DatabaseURL:    os.Getenv("DATABASE_URL"),
 	}
 }
