@@ -33,6 +33,15 @@ func (r *professionalRepository) FindByID(id string) (*domain.Professional, erro
 	return nil, errors.New("professional not found")
 }
 
+func (r *professionalRepository) FindByUserID(userID string) (*domain.Professional, error) {
+	for _, p := range r.data {
+		if p.UserID == userID {
+			return &p, nil
+		}
+	}
+	return nil, nil
+}
+
 func (r *professionalRepository) Create(p *domain.Professional) (*domain.Professional, error) {
 	r.data = append(r.data, *p)
 	return p, nil

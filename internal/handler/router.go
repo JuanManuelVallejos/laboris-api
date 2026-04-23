@@ -8,7 +8,7 @@ import (
 	"github.com/laboris/laboris-api/internal/middleware"
 )
 
-func NewRouter(ph *ProfessionalHandler, oh *OnboardingHandler) *gin.Engine {
+func NewRouter(ph *ProfessionalHandler, oh *OnboardingHandler, mh *MeHandler) *gin.Engine {
 	r := gin.Default()
 
 	r.Use(cors.New(cors.Config{
@@ -37,6 +37,7 @@ func NewRouter(ph *ProfessionalHandler, oh *OnboardingHandler) *gin.Engine {
 	priv.Use(middleware.ClerkAuth())
 	{
 		priv.POST("/onboarding", oh.Complete)
+		priv.GET("/me/professional", mh.GetMyProfessional)
 	}
 
 	return r

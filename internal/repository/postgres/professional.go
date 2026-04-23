@@ -60,6 +60,23 @@ func (r *ProfessionalRepository) FindByID(id string) (*domain.Professional, erro
 	return p, err
 }
 
+func (r *ProfessionalRepository) FindByUserID(userID string) (*domain.Professional, error) {
+	p := &domain.Professional{}
+	err := r.db.QueryRow(context.Background(), `
+		SELECT p.id, p.user_id, u.full_name, p.trade, p.zone, p.bio, p.verified,
+		       COALESCE(AVG(rv.rating), 0) AS rating
+		FROM professionals p
+		JOIN users u ON u.id = p.user_id
+		LEFT JOIN reviews rv ON rv.professional_id = p.id
+		WHERE p.user_id = $1
+		GROUP BY p.id, u.full_name
+	`, userID).Scan(&p.ID, &p.UserID, &p.Name, &p.Trade, &p.Zone, &p.Bio, &p.Verified, &p.Rating)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	return p, err
+}
+
 func (r *ProfessionalRepository) Create(p *domain.Professional) (*domain.Professional, error) {
 	err := r.db.QueryRow(context.Background(),
 		`INSERT INTO professionals (user_id, trade, zone, bio) VALUES ($1, $2, $3, $4)

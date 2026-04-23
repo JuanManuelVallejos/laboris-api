@@ -20,6 +20,7 @@ func main() {
 
 	var ph *handler.ProfessionalHandler
 	var oh *handler.OnboardingHandler
+	var mh *handler.MeHandler
 
 	if cfg.DatabaseURL != "" {
 		if err := db.RunMigrations(cfg.DatabaseURL); err != nil {
@@ -37,17 +38,19 @@ func main() {
 
 		ph = handler.NewProfessionalHandler(usecase.NewProfessionalUseCase(profRepo))
 		oh = handler.NewOnboardingHandler(usecase.NewOnboardingUseCase(userRepo, profRepo))
+		mh = handler.NewMeHandler(usecase.NewMeUseCase(userRepo, profRepo))
 
 		log.Println("using PostgreSQL")
 	} else {
 		profRepo := repomemory.NewProfessionalRepository()
 		ph = handler.NewProfessionalHandler(usecase.NewProfessionalUseCase(profRepo))
 		oh = handler.NewOnboardingHandler(usecase.NewOnboardingUseCase(nil, nil))
+		mh = handler.NewMeHandler(usecase.NewMeUseCase(nil, profRepo))
 
 		log.Println("using in-memory repository (no DATABASE_URL set)")
 	}
 
-	r := handler.NewRouter(ph, oh)
+	r := handler.NewRouter(ph, oh, mh)
 
 	log.Printf("starting laboris-api on :%s", cfg.Port)
 	if err := r.Run(":" + cfg.Port); err != nil {

@@ -14,5 +14,6 @@ type Professional struct {
 type ProfessionalRepository interface {
 	FindAll() ([]Professional, error)
 	FindByID(id string) (*Professional, error)
+	FindByUserID(userID string) (*Professional, error)
 	Create(p *Professional) (*Professional, error)
 }
