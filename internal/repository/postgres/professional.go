@@ -32,7 +32,7 @@ func (r *ProfessionalRepository) FindAll() ([]domain.Professional, error) {
 	}
 	defer rows.Close()
 
-	var result []domain.Professional
+	result := make([]domain.Professional, 0)
 	for rows.Next() {
 		var p domain.Professional
 		if err := rows.Scan(&p.ID, &p.UserID, &p.Name, &p.Trade, &p.Zone, &p.Bio, &p.Verified, &p.Rating); err != nil {
