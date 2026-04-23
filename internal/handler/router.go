@@ -8,7 +8,7 @@ import (
 	"github.com/laboris/laboris-api/internal/middleware"
 )
 
-func NewRouter(ph *ProfessionalHandler, oh *OnboardingHandler, mh *MeHandler) *gin.Engine {
+func NewRouter(ph *ProfessionalHandler, oh *OnboardingHandler, mh *MeHandler, rh *RequestHandler) *gin.Engine {
 	r := gin.Default()
 
 	r.Use(cors.New(cors.Config{
@@ -39,6 +39,10 @@ func NewRouter(ph *ProfessionalHandler, oh *OnboardingHandler, mh *MeHandler) *g
 		priv.POST("/onboarding", oh.Complete)
 		priv.GET("/me/professional", mh.GetMyProfessional)
 		priv.PUT("/me/professional", mh.UpdateMyProfessional)
+		priv.POST("/requests", rh.Create)
+		priv.GET("/me/requests/received", rh.ListReceived)
+		priv.GET("/me/requests/sent", rh.ListSent)
+		priv.PATCH("/requests/:id", rh.UpdateStatus)
 	}
 
 	return r
