@@ -56,7 +56,8 @@ func (h *RequestHandler) ListSent(c *gin.Context) {
 }
 
 type updateStatusBody struct {
-	Status string `json:"status" binding:"required,oneof=accepted rejected"`
+	Status string `json:"status"          binding:"required,oneof=accepted rejected"`
+	Reason string `json:"rejectionReason"`
 }
 
 func (h *RequestHandler) UpdateStatus(c *gin.Context) {
@@ -66,9 +67,9 @@ func (h *RequestHandler) UpdateStatus(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	r, err := h.uc.UpdateStatus(id, req.Status)
+	r, err := h.uc.UpdateStatus(id, req.Status, req.Reason)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 	c.JSON(http.StatusOK, r)

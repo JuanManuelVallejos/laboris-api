@@ -60,9 +60,12 @@ func (uc *RequestUseCase) ListSentByClient(clerkID string) ([]domain.Request, er
 	return uc.requests.FindByClientID(user.ID)
 }
 
-func (uc *RequestUseCase) UpdateStatus(id, status string) (*domain.Request, error) {
+func (uc *RequestUseCase) UpdateStatus(id, status, reason string) (*domain.Request, error) {
 	if status != "accepted" && status != "rejected" {
 		return nil, errors.New("invalid status")
 	}
-	return uc.requests.UpdateStatus(id, status)
+	if status == "rejected" && reason == "" {
+		return nil, errors.New("rejection reason is required")
+	}
+	return uc.requests.UpdateStatus(id, status, reason)
 }
