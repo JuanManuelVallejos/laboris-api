@@ -16,4 +16,5 @@ type ProfessionalRepository interface {
 	FindByID(id string) (*Professional, error)
 	FindByUserID(userID string) (*Professional, error)
 	Create(p *Professional) (*Professional, error)
+	UpdateByUserID(userID, trade, zone, bio string) (*Professional, error)
 }

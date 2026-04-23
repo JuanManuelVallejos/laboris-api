@@ -77,6 +77,19 @@ func (r *ProfessionalRepository) FindByUserID(userID string) (*domain.Profession
 	return p, err
 }
 
+func (r *ProfessionalRepository) UpdateByUserID(userID, trade, zone, bio string) (*domain.Professional, error) {
+	p := &domain.Professional{}
+	err := r.db.QueryRow(context.Background(), `
+		UPDATE professionals SET trade = $2, zone = $3, bio = $4
+		WHERE user_id = $1
+		RETURNING id, user_id, trade, zone, bio, verified
+	`, userID, trade, zone, bio).Scan(&p.ID, &p.UserID, &p.Trade, &p.Zone, &p.Bio, &p.Verified)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	return p, err
+}
+
 func (r *ProfessionalRepository) Create(p *domain.Professional) (*domain.Professional, error) {
 	err := r.db.QueryRow(context.Background(),
 		`INSERT INTO professionals (user_id, trade, zone, bio) VALUES ($1, $2, $3, $4)

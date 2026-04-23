@@ -38,6 +38,7 @@ func NewRouter(ph *ProfessionalHandler, oh *OnboardingHandler, mh *MeHandler) *g
 	{
 		priv.POST("/onboarding", oh.Complete)
 		priv.GET("/me/professional", mh.GetMyProfessional)
+		priv.PUT("/me/professional", mh.UpdateMyProfessional)
 	}
 
 	return r

@@ -25,3 +25,14 @@ func (uc *MeUseCase) GetMyProfessional(clerkID string) (*domain.Professional, er
 	}
 	return uc.professionals.FindByUserID(user.ID)
 }
+
+func (uc *MeUseCase) UpdateMyProfessional(clerkID, trade, zone, bio string) (*domain.Professional, error) {
+	user, err := uc.users.FindByClerkID(clerkID)
+	if err != nil {
+		return nil, err
+	}
+	if user == nil {
+		return nil, errors.New("user not found")
+	}
+	return uc.professionals.UpdateByUserID(user.ID, trade, zone, bio)
+}

@@ -42,6 +42,18 @@ func (r *professionalRepository) FindByUserID(userID string) (*domain.Profession
 	return nil, nil
 }
 
+func (r *professionalRepository) UpdateByUserID(userID, trade, zone, bio string) (*domain.Professional, error) {
+	for i, p := range r.data {
+		if p.UserID == userID {
+			r.data[i].Trade = trade
+			r.data[i].Zone = zone
+			r.data[i].Bio = bio
+			return &r.data[i], nil
+		}
+	}
+	return nil, nil
+}
+
 func (r *professionalRepository) Create(p *domain.Professional) (*domain.Professional, error) {
 	r.data = append(r.data, *p)
 	return p, nil
