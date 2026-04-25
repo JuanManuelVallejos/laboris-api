@@ -22,6 +22,7 @@ func main() {
 	var oh *handler.OnboardingHandler
 	var mh *handler.MeHandler
 	var rh *handler.RequestHandler
+	var nh *handler.NotificationHandler
 
 	if cfg.DatabaseURL != "" {
 		if err := db.RunMigrations(cfg.DatabaseURL); err != nil {
@@ -37,11 +38,17 @@ func main() {
 		profRepo := repopostgres.NewProfessionalRepository(pool)
 		userRepo := repopostgres.NewUserRepository(pool)
 		reqRepo := repopostgres.NewRequestRepository(pool)
+		notifRepo := repopostgres.NewNotificationRepository(pool)
+
+		notifUC := usecase.NewNotificationUseCase(notifRepo, userRepo)
+		reqUC := usecase.NewRequestUseCase(reqRepo, userRepo, profRepo)
+		reqUC.SetNotifications(notifUC)
 
 		ph = handler.NewProfessionalHandler(usecase.NewProfessionalUseCase(profRepo))
 		oh = handler.NewOnboardingHandler(usecase.NewOnboardingUseCase(userRepo, profRepo))
 		mh = handler.NewMeHandler(usecase.NewMeUseCase(userRepo, profRepo))
-		rh = handler.NewRequestHandler(usecase.NewRequestUseCase(reqRepo, userRepo, profRepo))
+		rh = handler.NewRequestHandler(reqUC)
+		nh = handler.NewNotificationHandler(notifUC)
 
 		log.Println("using PostgreSQL")
 	} else {
@@ -54,7 +61,7 @@ func main() {
 		log.Println("using in-memory repository (no DATABASE_URL set)")
 	}
 
-	r := handler.NewRouter(ph, oh, mh, rh)
+	r := handler.NewRouter(ph, oh, mh, rh, nh)
 
 	log.Printf("starting laboris-api on :%s", cfg.Port)
 	if err := r.Run(":" + cfg.Port); err != nil {
