@@ -9,6 +9,7 @@ type Professional struct {
 	Bio      string  `json:"bio"`
 	Rating   float64 `json:"rating"`
 	Verified bool    `json:"verified"`
+	Status   string  `json:"status"`
 }
 
 type ProfessionalRepository interface {
@@ -17,4 +18,8 @@ type ProfessionalRepository interface {
 	FindByUserID(userID string) (*Professional, error)
 	Create(p *Professional) (*Professional, error)
 	UpdateByUserID(userID, trade, zone, bio string) (*Professional, error)
+	FindAllPaginated(page, limit int) ([]Professional, int64, error)
+	SetVerified(id string, verified bool) error
+	SetStatus(id string, status string) error
+	Delete(id string) error
 }

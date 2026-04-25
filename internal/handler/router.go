@@ -5,10 +5,11 @@ import (
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/laboris/laboris-api/internal/middleware"
 )
 
-func NewRouter(ph *ProfessionalHandler, oh *OnboardingHandler, mh *MeHandler, rh *RequestHandler, nh *NotificationHandler) *gin.Engine {
+func NewRouter(ph *ProfessionalHandler, oh *OnboardingHandler, mh *MeHandler, rh *RequestHandler, nh *NotificationHandler, ah *AdminHandler, db *pgxpool.Pool) *gin.Engine {
 	r := gin.Default()
 
 	r.Use(cors.New(cors.Config{
@@ -48,6 +49,18 @@ func NewRouter(ph *ProfessionalHandler, oh *OnboardingHandler, mh *MeHandler, rh
 			priv.GET("/me/notifications", nh.List)
 			priv.GET("/me/notifications/unread-count", nh.UnreadCount)
 			priv.POST("/me/notifications/read-all", nh.MarkAllRead)
+		}
+	}
+
+	if ah != nil && db != nil {
+		adminGrp := r.Group("/api/v1/admin")
+		adminGrp.Use(middleware.ClerkAuth(), middleware.AdminAuth(db))
+		{
+			adminGrp.GET("/users", ah.ListUsers)
+			adminGrp.GET("/professionals", ah.ListProfessionals)
+			adminGrp.PATCH("/professionals/:id/verify", ah.VerifyProfessional)
+			adminGrp.PATCH("/professionals/:id/status", ah.SetProfessionalStatus)
+			adminGrp.DELETE("/professionals/:id", ah.DeleteProfessional)
 		}
 	}
 

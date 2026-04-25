@@ -10,8 +10,14 @@ type User struct {
 	CreatedAt time.Time `json:"createdAt"`
 }
 
+type UserWithRoles struct {
+	User
+	Roles []string `json:"roles"`
+}
+
 type UserRepository interface {
 	FindByClerkID(clerkID string) (*User, error)
 	Create(user *User) (*User, error)
 	AddRole(userID string, role string) error
+	FindAllPaginated(page, limit int) ([]UserWithRoles, int64, error)
 }

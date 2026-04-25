@@ -48,3 +48,36 @@ func (r *UserRepository) AddRole(userID string, role string) error {
 	)
 	return err
 }
+
+func (r *UserRepository) FindAllPaginated(page, limit int) ([]domain.UserWithRoles, int64, error) {
+	offset := (page - 1) * limit
+
+	var total int64
+	if err := r.db.QueryRow(context.Background(), `SELECT COUNT(*) FROM users`).Scan(&total); err != nil {
+		return nil, 0, err
+	}
+
+	rows, err := r.db.Query(context.Background(), `
+		SELECT u.id, u.clerk_id, u.email, u.full_name, u.created_at,
+		       COALESCE(array_agg(ur.role) FILTER (WHERE ur.role IS NOT NULL), '{}') AS roles
+		FROM users u
+		LEFT JOIN user_roles ur ON ur.user_id = u.id
+		GROUP BY u.id
+		ORDER BY u.created_at DESC
+		LIMIT $1 OFFSET $2
+	`, limit, offset)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+
+	result := make([]domain.UserWithRoles, 0)
+	for rows.Next() {
+		var uw domain.UserWithRoles
+		if err := rows.Scan(&uw.ID, &uw.ClerkID, &uw.Email, &uw.FullName, &uw.CreatedAt, &uw.Roles); err != nil {
+			return nil, 0, err
+		}
+		result = append(result, uw)
+	}
+	return result, total, nil
+}

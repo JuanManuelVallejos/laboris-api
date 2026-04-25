@@ -58,3 +58,37 @@ func (r *professionalRepository) Create(p *domain.Professional) (*domain.Profess
 	r.data = append(r.data, *p)
 	return p, nil
 }
+
+func (r *professionalRepository) FindAllPaginated(page, limit int) ([]domain.Professional, int64, error) {
+	return r.data, int64(len(r.data)), nil
+}
+
+func (r *professionalRepository) SetVerified(id string, verified bool) error {
+	for i, p := range r.data {
+		if p.ID == id {
+			r.data[i].Verified = verified
+			return nil
+		}
+	}
+	return nil
+}
+
+func (r *professionalRepository) SetStatus(id string, status string) error {
+	for i, p := range r.data {
+		if p.ID == id {
+			r.data[i].Status = status
+			return nil
+		}
+	}
+	return nil
+}
+
+func (r *professionalRepository) Delete(id string) error {
+	for i, p := range r.data {
+		if p.ID == id {
+			r.data = append(r.data[:i], r.data[i+1:]...)
+			return nil
+		}
+	}
+	return nil
+}

@@ -5,6 +5,7 @@ import (
 	"log"
 
 	"github.com/clerk/clerk-sdk-go/v2"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/laboris/laboris-api/config"
 	"github.com/laboris/laboris-api/internal/db"
 	"github.com/laboris/laboris-api/internal/handler"
@@ -23,13 +24,16 @@ func main() {
 	var mh *handler.MeHandler
 	var rh *handler.RequestHandler
 	var nh *handler.NotificationHandler
+	var ah *handler.AdminHandler
+	var pool *pgxpool.Pool
 
 	if cfg.DatabaseURL != "" {
 		if err := db.RunMigrations(cfg.DatabaseURL); err != nil {
 			log.Fatalf("migrations failed: %v", err)
 		}
 
-		pool, err := db.NewPool(context.Background(), cfg.DatabaseURL)
+		var err error
+		pool, err = db.NewPool(context.Background(), cfg.DatabaseURL)
 		if err != nil {
 			log.Fatalf("db connection failed: %v", err)
 		}
@@ -49,6 +53,7 @@ func main() {
 		mh = handler.NewMeHandler(usecase.NewMeUseCase(userRepo, profRepo))
 		rh = handler.NewRequestHandler(reqUC)
 		nh = handler.NewNotificationHandler(notifUC)
+		ah = handler.NewAdminHandler(usecase.NewAdminUseCase(userRepo, profRepo))
 
 		log.Println("using PostgreSQL")
 	} else {
@@ -61,7 +66,7 @@ func main() {
 		log.Println("using in-memory repository (no DATABASE_URL set)")
 	}
 
-	r := handler.NewRouter(ph, oh, mh, rh, nh)
+	r := handler.NewRouter(ph, oh, mh, rh, nh, ah, pool)
 
 	log.Printf("starting laboris-api on :%s", cfg.Port)
 	if err := r.Run(":" + cfg.Port); err != nil {
