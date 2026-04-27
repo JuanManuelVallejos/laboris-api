@@ -48,15 +48,16 @@ type Job struct {
 	VisitQuoteAmount  *float64   `json:"visitQuoteAmount,omitempty"`
 	WorkQuoteAmount   *float64   `json:"workQuoteAmount,omitempty"`
 	WorkDescription   string     `json:"workDescription,omitempty"`
-	ReworkCount       int        `json:"reworkCount"`
-	ReworkNotes       string     `json:"reworkNotes,omitempty"`
-	ReworkQuoteAmount *float64   `json:"reworkQuoteAmount,omitempty"`
-	CancelReason      string     `json:"cancelReason,omitempty"`
-	CompletedAt       *time.Time `json:"completedAt,omitempty"`
-	CancelledAt       *time.Time `json:"cancelledAt,omitempty"`
-	Payments          []Payment  `json:"payments"`
-	CreatedAt         time.Time  `json:"createdAt"`
-	UpdatedAt         time.Time  `json:"updatedAt"`
+	ReworkCount       int            `json:"reworkCount"`
+	ReworkNotes       string         `json:"reworkNotes,omitempty"`
+	ReworkQuoteAmount *float64       `json:"reworkQuoteAmount,omitempty"`
+	CancelReason      string         `json:"cancelReason,omitempty"`
+	CompletedAt       *time.Time     `json:"completedAt,omitempty"`
+	CancelledAt       *time.Time     `json:"cancelledAt,omitempty"`
+	Payments          []Payment      `json:"payments"`
+	ReworkRecords     []ReworkRecord `json:"reworkRecords"`
+	CreatedAt         time.Time      `json:"createdAt"`
+	UpdatedAt         time.Time      `json:"updatedAt"`
 }
 
 type JobRepository interface {

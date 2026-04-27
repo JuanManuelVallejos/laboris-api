@@ -47,6 +47,7 @@ func main() {
 		jobRepo := repopostgres.NewJobRepository(pool)
 		msgRepo := repopostgres.NewMessageRepository(pool)
 		payRepo := repopostgres.NewPaymentRepository(pool)
+		reworkRepo := repopostgres.NewReworkRecordRepository(pool)
 
 		notifUC := usecase.NewNotificationUseCase(notifRepo, userRepo)
 
@@ -54,7 +55,7 @@ func main() {
 		reqUC.SetNotifications(notifUC)
 		reqUC.SetJobRepository(jobRepo)
 
-		jobUC := usecase.NewJobUseCase(jobRepo, payRepo, userRepo, profRepo)
+		jobUC := usecase.NewJobUseCase(jobRepo, payRepo, userRepo, profRepo, reworkRepo)
 		jobUC.SetNotifications(notifUC)
 
 		msgUC := usecase.NewMessageUseCase(msgRepo, reqRepo, userRepo, profRepo)

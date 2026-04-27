@@ -13,6 +13,7 @@ type JobUseCase struct {
 	payments      domain.PaymentRepository
 	users         domain.UserRepository
 	professionals domain.ProfessionalRepository
+	reworks       domain.ReworkRecordRepository
 	notifications *NotificationUseCase
 }
 
@@ -21,8 +22,9 @@ func NewJobUseCase(
 	payments domain.PaymentRepository,
 	users domain.UserRepository,
 	professionals domain.ProfessionalRepository,
+	reworks domain.ReworkRecordRepository,
 ) *JobUseCase {
-	return &JobUseCase{jobs: jobs, payments: payments, users: users, professionals: professionals}
+	return &JobUseCase{jobs: jobs, payments: payments, users: users, professionals: professionals, reworks: reworks}
 }
 
 func (uc *JobUseCase) SetNotifications(n *NotificationUseCase) {
@@ -338,6 +340,13 @@ func (uc *JobUseCase) RequestRework(clerkID, jobID string, notes string) (*domai
 	if err != nil {
 		return nil, err
 	}
+	if uc.reworks != nil {
+		_, _ = uc.reworks.Create(&domain.ReworkRecord{
+			JobID:       job.ID,
+			CycleNumber: job.ReworkCount,
+			Notes:       notes,
+		})
+	}
 	msg := fmt.Sprintf("%s solicitó correcciones (retrabajo #%d)", job.ClientName, job.ReworkCount)
 	uc.notify(job.ProfessionalUID, "job_rework_requested", msg)
 	if job.ReworkCount > 2 {
@@ -369,6 +378,9 @@ func (uc *JobUseCase) SubmitReworkQuote(clerkID, jobID string, amount float64) (
 	job, err = uc.jobs.Update(job)
 	if err != nil {
 		return nil, err
+	}
+	if uc.reworks != nil {
+		_ = uc.reworks.UpdateQuoteAmount(job.ID, job.ReworkCount, amount)
 	}
 	uc.notify(job.ClientID, "job_rework_quoted",
 		fmt.Sprintf("%s cotizó las correcciones en $%.2f. Aprobá para retomar el trabajo.", job.ProfessionalName, amount))

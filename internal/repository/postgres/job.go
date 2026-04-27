@@ -75,6 +75,7 @@ func scanJob(row interface{ Scan(...any) error }) (*domain.Job, error) {
 	j.CompletedAt = completedAt
 	j.CancelledAt = cancelledAt
 	j.Payments = []domain.Payment{}
+	j.ReworkRecords = []domain.ReworkRecord{}
 	return j, nil
 }
 
@@ -104,6 +105,11 @@ func (r *JobRepository) FindByID(id string) (*domain.Job, error) {
 		return nil, err
 	}
 	j.Payments = payments
+	reworkRecords, err := r.fetchReworkRecords(j.ID)
+	if err != nil {
+		return nil, err
+	}
+	j.ReworkRecords = reworkRecords
 	return j, nil
 }
 
@@ -162,6 +168,33 @@ func (r *JobRepository) Update(j *domain.Job) (*domain.Job, error) {
 		j.CancelReason, j.CompletedAt, j.CancelledAt,
 	).Scan(&j.UpdatedAt)
 	return j, err
+}
+
+func (r *JobRepository) fetchReworkRecords(jobID string) ([]domain.ReworkRecord, error) {
+	rows, err := r.db.Query(context.Background(), `
+		SELECT id, job_id, cycle_number, COALESCE(notes,''), quote_amount, created_at
+		FROM job_rework_records
+		WHERE job_id = $1
+		ORDER BY cycle_number ASC
+	`, jobID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var records []domain.ReworkRecord
+	for rows.Next() {
+		var rec domain.ReworkRecord
+		var quoteAmount *float64
+		if err := rows.Scan(&rec.ID, &rec.JobID, &rec.CycleNumber, &rec.Notes, &quoteAmount, &rec.CreatedAt); err != nil {
+			return nil, err
+		}
+		rec.QuoteAmount = quoteAmount
+		records = append(records, rec)
+	}
+	if records == nil {
+		records = []domain.ReworkRecord{}
+	}
+	return records, nil
 }
 
 func (r *JobRepository) fetchPayments(jobID string) ([]domain.Payment, error) {
