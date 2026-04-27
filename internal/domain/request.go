@@ -11,11 +11,13 @@ type Request struct {
 	Description      string    `json:"description"`
 	Status           string    `json:"status"`
 	RejectionReason  string    `json:"rejectionReason"`
+	JobID            string    `json:"jobId,omitempty"`
 	CreatedAt        time.Time `json:"createdAt"`
 }
 
 type RequestRepository interface {
 	Create(r *Request) (*Request, error)
+	FindByID(id string) (*Request, error)
 	FindByProfessionalID(professionalID string) ([]Request, error)
 	FindByClientID(clientID string) ([]Request, error)
 	UpdateStatus(id, status, reason string) (*Request, error)

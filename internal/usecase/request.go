@@ -12,6 +12,7 @@ type RequestUseCase struct {
 	users         domain.UserRepository
 	professionals domain.ProfessionalRepository
 	notifications *NotificationUseCase
+	jobs          domain.JobRepository
 }
 
 func NewRequestUseCase(requests domain.RequestRepository, users domain.UserRepository, professionals domain.ProfessionalRepository) *RequestUseCase {
@@ -20,6 +21,10 @@ func NewRequestUseCase(requests domain.RequestRepository, users domain.UserRepos
 
 func (uc *RequestUseCase) SetNotifications(n *NotificationUseCase) {
 	uc.notifications = n
+}
+
+func (uc *RequestUseCase) SetJobRepository(jobs domain.JobRepository) {
+	uc.jobs = jobs
 }
 
 func (uc *RequestUseCase) Create(clerkID, professionalID, description string) (*domain.Request, error) {
@@ -102,6 +107,14 @@ func (uc *RequestUseCase) UpdateStatus(id, status, reason string) (*domain.Reque
 			}
 			_ = uc.notifications.CreateForUser(rq.ClientID, "request_"+status, msg)
 		}
+	}
+
+	if status == "accepted" && uc.jobs != nil {
+		_, _ = uc.jobs.Create(&domain.Job{
+			RequestID:      rq.ID,
+			ClientID:       rq.ClientID,
+			ProfessionalID: rq.ProfessionalID,
+		})
 	}
 
 	return rq, nil

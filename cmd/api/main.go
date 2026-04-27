@@ -25,6 +25,7 @@ func main() {
 	var rh *handler.RequestHandler
 	var nh *handler.NotificationHandler
 	var ah *handler.AdminHandler
+	var jh *handler.JobHandler
 	var pool *pgxpool.Pool
 
 	if cfg.DatabaseURL != "" {
@@ -43,10 +44,20 @@ func main() {
 		userRepo := repopostgres.NewUserRepository(pool)
 		reqRepo := repopostgres.NewRequestRepository(pool)
 		notifRepo := repopostgres.NewNotificationRepository(pool)
+		jobRepo := repopostgres.NewJobRepository(pool)
+		msgRepo := repopostgres.NewMessageRepository(pool)
+		payRepo := repopostgres.NewPaymentRepository(pool)
 
 		notifUC := usecase.NewNotificationUseCase(notifRepo, userRepo)
+
 		reqUC := usecase.NewRequestUseCase(reqRepo, userRepo, profRepo)
 		reqUC.SetNotifications(notifUC)
+		reqUC.SetJobRepository(jobRepo)
+
+		jobUC := usecase.NewJobUseCase(jobRepo, payRepo, userRepo, profRepo)
+		jobUC.SetNotifications(notifUC)
+
+		msgUC := usecase.NewMessageUseCase(msgRepo, reqRepo, userRepo, profRepo)
 
 		ph = handler.NewProfessionalHandler(usecase.NewProfessionalUseCase(profRepo))
 		oh = handler.NewOnboardingHandler(usecase.NewOnboardingUseCase(userRepo, profRepo))
@@ -54,6 +65,7 @@ func main() {
 		rh = handler.NewRequestHandler(reqUC)
 		nh = handler.NewNotificationHandler(notifUC)
 		ah = handler.NewAdminHandler(usecase.NewAdminUseCase(userRepo, profRepo))
+		jh = handler.NewJobHandler(jobUC, msgUC)
 
 		log.Println("using PostgreSQL")
 	} else {
@@ -66,7 +78,7 @@ func main() {
 		log.Println("using in-memory repository (no DATABASE_URL set)")
 	}
 
-	r := handler.NewRouter(ph, oh, mh, rh, nh, ah, pool)
+	r := handler.NewRouter(ph, oh, mh, rh, nh, ah, jh, pool)
 
 	log.Printf("starting laboris-api on :%s", cfg.Port)
 	if err := r.Run(":" + cfg.Port); err != nil {
