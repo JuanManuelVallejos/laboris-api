@@ -418,6 +418,7 @@ func (uc *JobUseCase) AcceptRework(clerkID, jobID string) (*domain.Job, error) {
 		return nil, err
 	}
 	job.Status = domain.JobStatusWorkInProgress
+	job.ReworkQuoteAmount = nil // no extra cost — clear any amount from a previous cycle
 	job, err = uc.jobs.Update(job)
 	if err != nil {
 		return nil, err
