@@ -135,6 +135,21 @@ func (h *JobHandler) RequestRework(c *gin.Context) {
 	h.respond(c, job, err)
 }
 
+func (h *JobHandler) SubmitReworkQuote(c *gin.Context) {
+	var body amountBody
+	if err := c.ShouldBindJSON(&body); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	job, err := h.uc.SubmitReworkQuote(c.GetString("userId"), c.Param("id"), body.Amount)
+	h.respond(c, job, err)
+}
+
+func (h *JobHandler) ApproveReworkQuote(c *gin.Context) {
+	job, err := h.uc.ApproveReworkQuote(c.GetString("userId"), c.Param("id"))
+	h.respond(c, job, err)
+}
+
 func (h *JobHandler) AcceptRework(c *gin.Context) {
 	job, err := h.uc.AcceptRework(c.GetString("userId"), c.Param("id"))
 	h.respond(c, job, err)

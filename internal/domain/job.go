@@ -13,6 +13,7 @@ const (
 	JobStatusWorkInProgress  = "work_in_progress"
 	JobStatusWorkDelivered   = "work_delivered"
 	JobStatusReworkRequested = "rework_requested"
+	JobStatusReworkQuoted    = "rework_quoted"
 	JobStatusCompleted       = "completed"
 	JobStatusCancelled       = "cancelled"
 )
@@ -28,7 +29,8 @@ var ValidTransitions = map[string]map[string]bool{
 	JobStatusWorkApproved:    {JobStatusWorkInProgress: true, JobStatusCancelled: true},
 	JobStatusWorkInProgress:  {JobStatusWorkDelivered: true, JobStatusCancelled: true},
 	JobStatusWorkDelivered:   {JobStatusReworkRequested: true, JobStatusCompleted: true},
-	JobStatusReworkRequested: {JobStatusWorkInProgress: true, JobStatusCancelled: true},
+	JobStatusReworkRequested: {JobStatusReworkQuoted: true, JobStatusWorkInProgress: true, JobStatusCancelled: true},
+	JobStatusReworkQuoted:    {JobStatusWorkInProgress: true, JobStatusCancelled: true},
 	JobStatusCompleted:       {},
 	JobStatusCancelled:       {},
 }
@@ -48,6 +50,7 @@ type Job struct {
 	WorkDescription   string     `json:"workDescription,omitempty"`
 	ReworkCount       int        `json:"reworkCount"`
 	ReworkNotes       string     `json:"reworkNotes,omitempty"`
+	ReworkQuoteAmount *float64   `json:"reworkQuoteAmount,omitempty"`
 	CancelReason      string     `json:"cancelReason,omitempty"`
 	CompletedAt       *time.Time `json:"completedAt,omitempty"`
 	CancelledAt       *time.Time `json:"cancelledAt,omitempty"`

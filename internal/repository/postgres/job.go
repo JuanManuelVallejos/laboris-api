@@ -23,6 +23,7 @@ const jobSelectCols = `
 	j.status,
 	j.visit_scheduled_at, j.visit_quote_amount, j.work_quote_amount,
 	j.work_description,   j.rework_count,       j.rework_notes,
+	j.rework_quote_amount,
 	j.cancel_reason,      j.completed_at,        j.cancelled_at,
 	j.created_at,         j.updated_at`
 
@@ -35,14 +36,15 @@ const jobJoins = `
 func scanJob(row interface{ Scan(...any) error }) (*domain.Job, error) {
 	j := &domain.Job{}
 	var (
-		visitScheduledAt *time.Time
-		visitQuoteAmount *float64
-		workQuoteAmount  *float64
-		workDescription  *string
-		reworkNotes      *string
-		cancelReason     *string
-		completedAt      *time.Time
-		cancelledAt      *time.Time
+		visitScheduledAt  *time.Time
+		visitQuoteAmount  *float64
+		workQuoteAmount   *float64
+		workDescription   *string
+		reworkNotes       *string
+		reworkQuoteAmount *float64
+		cancelReason      *string
+		completedAt       *time.Time
+		cancelledAt       *time.Time
 	)
 	if err := row.Scan(
 		&j.ID, &j.RequestID,
@@ -51,6 +53,7 @@ func scanJob(row interface{ Scan(...any) error }) (*domain.Job, error) {
 		&j.Status,
 		&visitScheduledAt, &visitQuoteAmount, &workQuoteAmount,
 		&workDescription, &j.ReworkCount, &reworkNotes,
+		&reworkQuoteAmount,
 		&cancelReason, &completedAt, &cancelledAt,
 		&j.CreatedAt, &j.UpdatedAt,
 	); err != nil {
@@ -65,6 +68,7 @@ func scanJob(row interface{ Scan(...any) error }) (*domain.Job, error) {
 	if reworkNotes != nil {
 		j.ReworkNotes = *reworkNotes
 	}
+	j.ReworkQuoteAmount = reworkQuoteAmount
 	if cancelReason != nil {
 		j.CancelReason = *cancelReason
 	}
@@ -136,23 +140,25 @@ func (r *JobRepository) FindByRequestID(requestID string) (*domain.Job, error) {
 func (r *JobRepository) Update(j *domain.Job) (*domain.Job, error) {
 	err := r.db.QueryRow(context.Background(), `
 		UPDATE jobs SET
-			status             = $2,
-			visit_scheduled_at = $3,
-			visit_quote_amount = $4,
-			work_quote_amount  = $5,
-			work_description   = NULLIF($6,''),
-			rework_count       = $7,
-			rework_notes       = NULLIF($8,''),
-			cancel_reason      = NULLIF($9,''),
-			completed_at       = $10,
-			cancelled_at       = $11,
-			updated_at         = NOW()
+			status              = $2,
+			visit_scheduled_at  = $3,
+			visit_quote_amount  = $4,
+			work_quote_amount   = $5,
+			work_description    = NULLIF($6,''),
+			rework_count        = $7,
+			rework_notes        = NULLIF($8,''),
+			rework_quote_amount = $9,
+			cancel_reason       = NULLIF($10,''),
+			completed_at        = $11,
+			cancelled_at        = $12,
+			updated_at          = NOW()
 		WHERE id = $1
 		RETURNING updated_at
 	`,
 		j.ID, j.Status,
 		j.VisitScheduledAt, j.VisitQuoteAmount, j.WorkQuoteAmount,
 		j.WorkDescription, j.ReworkCount, j.ReworkNotes,
+		j.ReworkQuoteAmount,
 		j.CancelReason, j.CompletedAt, j.CancelledAt,
 	).Scan(&j.UpdatedAt)
 	return j, err

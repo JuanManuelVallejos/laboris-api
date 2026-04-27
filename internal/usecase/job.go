@@ -348,7 +348,60 @@ func (uc *JobUseCase) RequestRework(clerkID, jobID string, notes string) (*domai
 	return job, nil
 }
 
-// AcceptRework: rework_requested → work_in_progress (professional)
+// SubmitReworkQuote: rework_requested → rework_quoted (professional, extra cost)
+func (uc *JobUseCase) SubmitReworkQuote(clerkID, jobID string, amount float64) (*domain.Job, error) {
+	_, prof, err := uc.resolveUser(clerkID)
+	if err != nil {
+		return nil, err
+	}
+	job, err := uc.jobs.FindByID(jobID)
+	if err != nil {
+		return nil, err
+	}
+	if prof == nil || prof.ID != job.ProfessionalID {
+		return nil, errors.New("forbidden: only the professional can submit a rework quote")
+	}
+	if err := validateTransition(job.Status, domain.JobStatusReworkQuoted); err != nil {
+		return nil, err
+	}
+	job.Status = domain.JobStatusReworkQuoted
+	job.ReworkQuoteAmount = &amount
+	job, err = uc.jobs.Update(job)
+	if err != nil {
+		return nil, err
+	}
+	uc.notify(job.ClientID, "job_rework_quoted",
+		fmt.Sprintf("%s cotizó las correcciones en $%.2f. Aprobá para retomar el trabajo.", job.ProfessionalName, amount))
+	return job, nil
+}
+
+// ApproveReworkQuote: rework_quoted → work_in_progress (client)
+func (uc *JobUseCase) ApproveReworkQuote(clerkID, jobID string) (*domain.Job, error) {
+	user, _, err := uc.resolveUser(clerkID)
+	if err != nil {
+		return nil, err
+	}
+	job, err := uc.jobs.FindByID(jobID)
+	if err != nil {
+		return nil, err
+	}
+	if user.ID != job.ClientID {
+		return nil, errors.New("forbidden: only the client can approve the rework quote")
+	}
+	if err := validateTransition(job.Status, domain.JobStatusWorkInProgress); err != nil {
+		return nil, err
+	}
+	job.Status = domain.JobStatusWorkInProgress
+	job, err = uc.jobs.Update(job)
+	if err != nil {
+		return nil, err
+	}
+	uc.notify(job.ProfessionalUID, "job_rework_quote_approved",
+		fmt.Sprintf("%s aprobó la cotización de correcciones. Retomá el trabajo.", job.ClientName))
+	return job, nil
+}
+
+// AcceptRework: rework_requested → work_in_progress (professional, no extra cost)
 func (uc *JobUseCase) AcceptRework(clerkID, jobID string) (*domain.Job, error) {
 	_, prof, err := uc.resolveUser(clerkID)
 	if err != nil {
