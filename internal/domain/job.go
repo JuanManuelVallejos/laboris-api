@@ -21,7 +21,7 @@ const (
 // ValidTransitions defines allowed state transitions for a Job.
 var ValidTransitions = map[string]map[string]bool{
 	JobStatusPendingVisit:    {JobStatusVisitScheduled: true, JobStatusWorkQuoted: true, JobStatusCancelled: true},
-	JobStatusVisitScheduled:  {JobStatusVisitQuoted: true, JobStatusCancelled: true},
+	JobStatusVisitScheduled:  {JobStatusVisitCompleted: true, JobStatusVisitQuoted: true, JobStatusCancelled: true},
 	JobStatusVisitQuoted:     {JobStatusVisitPaid: true, JobStatusCancelled: true},
 	JobStatusVisitPaid:       {JobStatusVisitCompleted: true, JobStatusCancelled: true},
 	JobStatusVisitCompleted:  {JobStatusWorkQuoted: true, JobStatusCancelled: true},

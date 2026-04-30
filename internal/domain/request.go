@@ -2,6 +2,14 @@ package domain
 
 import "time"
 
+const (
+	RequestStatusPending  = "pending"
+	RequestStatusViewed   = "viewed"
+	RequestStatusAccepted = "accepted"
+	RequestStatusRejected = "rejected"
+	RequestStatusExpired  = "expired"
+)
+
 type Request struct {
 	ID               string    `json:"id"`
 	ClientID         string    `json:"clientId"`
@@ -21,4 +29,5 @@ type RequestRepository interface {
 	FindByProfessionalID(professionalID string) ([]Request, error)
 	FindByClientID(clientID string) ([]Request, error)
 	UpdateStatus(id, status, reason string) (*Request, error)
+	MarkAllPendingAsViewed(professionalID string) error
 }

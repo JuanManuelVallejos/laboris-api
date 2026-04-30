@@ -2,7 +2,10 @@ package postgres
 
 import (
 	"context"
+	"errors"
+	"strings"
 
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/laboris/laboris-api/internal/domain"
 )
@@ -22,7 +25,23 @@ func (r *RequestRepository) Create(req *domain.Request) (*domain.Request, error)
 		RETURNING id, client_id, professional_id, description, status, COALESCE(rejection_reason,''), created_at
 	`, req.ClientID, req.ProfessionalID, req.Description,
 	).Scan(&req.ID, &req.ClientID, &req.ProfessionalID, &req.Description, &req.Status, &req.RejectionReason, &req.CreatedAt)
-	return req, err
+	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" &&
+			strings.Contains(pgErr.ConstraintName, "uq_requests_active_per_pair") {
+			return nil, errors.New("ya existe una solicitud activa para este profesional")
+		}
+		return nil, err
+	}
+	return req, nil
+}
+
+func (r *RequestRepository) MarkAllPendingAsViewed(professionalID string) error {
+	_, err := r.db.Exec(context.Background(), `
+		UPDATE requests SET status = 'viewed'
+		WHERE professional_id = $1 AND status = 'pending'
+	`, professionalID)
+	return err
 }
 
 func (r *RequestRepository) FindByID(id string) (*domain.Request, error) {

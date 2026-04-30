@@ -70,6 +70,7 @@ func (uc *RequestUseCase) ListReceivedByProfessional(clerkID string) ([]domain.R
 	if prof == nil {
 		return nil, errors.New("professional profile not found")
 	}
+	_ = uc.requests.MarkAllPendingAsViewed(prof.ID)
 	return uc.requests.FindByProfessionalID(prof.ID)
 }
 
@@ -85,7 +86,7 @@ func (uc *RequestUseCase) ListSentByClient(clerkID string) ([]domain.Request, er
 }
 
 func (uc *RequestUseCase) UpdateStatus(id, status, reason string) (*domain.Request, error) {
-	if status != "accepted" && status != "rejected" {
+	if status != domain.RequestStatusAccepted && status != domain.RequestStatusRejected {
 		return nil, errors.New("invalid status")
 	}
 	if status == "rejected" && reason == "" {
