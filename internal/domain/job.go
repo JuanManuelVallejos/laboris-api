@@ -4,6 +4,7 @@ import "time"
 
 const (
 	JobStatusPendingVisit    = "pending_visit"
+	JobStatusVisitProposed   = "visit_proposed"
 	JobStatusVisitScheduled  = "visit_scheduled"
 	JobStatusVisitQuoted     = "visit_quoted"
 	JobStatusVisitPaid       = "visit_paid"
@@ -20,7 +21,8 @@ const (
 
 // ValidTransitions defines allowed state transitions for a Job.
 var ValidTransitions = map[string]map[string]bool{
-	JobStatusPendingVisit:    {JobStatusVisitScheduled: true, JobStatusWorkQuoted: true, JobStatusCancelled: true},
+	JobStatusPendingVisit:    {JobStatusVisitProposed: true, JobStatusWorkQuoted: true, JobStatusCancelled: true},
+	JobStatusVisitProposed:   {JobStatusVisitScheduled: true, JobStatusPendingVisit: true, JobStatusCancelled: true},
 	JobStatusVisitScheduled:  {JobStatusVisitCompleted: true, JobStatusVisitQuoted: true, JobStatusCancelled: true},
 	JobStatusVisitQuoted:     {JobStatusVisitPaid: true, JobStatusCancelled: true},
 	JobStatusVisitPaid:       {JobStatusVisitCompleted: true, JobStatusCancelled: true},

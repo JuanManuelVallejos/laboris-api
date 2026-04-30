@@ -55,6 +55,8 @@ func NewRouter(ph *ProfessionalHandler, oh *OnboardingHandler, mh *MeHandler, rh
 			priv.GET("/me/jobs", jh.ListMyJobs)
 			priv.GET("/jobs/:id", jh.GetJob)
 			priv.PATCH("/jobs/:id/schedule-visit", jh.ScheduleVisit)
+			priv.PATCH("/jobs/:id/confirm-visit", jh.ConfirmVisit)
+			priv.PATCH("/jobs/:id/decline-visit", jh.DeclineVisit)
 			priv.PATCH("/jobs/:id/visit-quote", jh.SubmitVisitQuote)
 			priv.PATCH("/jobs/:id/skip-visit", jh.SkipVisit)
 			priv.PATCH("/jobs/:id/pay-visit", jh.PayVisit)

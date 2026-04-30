@@ -63,7 +63,7 @@ func (uc *JobUseCase) ListByUser(clerkID string) ([]domain.Job, error) {
 	return uc.jobs.FindByUserID(user.ID)
 }
 
-// ScheduleVisit: pending_visit → visit_scheduled (professional)
+// ScheduleVisit: pending_visit → visit_proposed (professional proposes a date)
 func (uc *JobUseCase) ScheduleVisit(clerkID, jobID string, scheduledAt time.Time) (*domain.Job, error) {
 	user, prof, err := uc.resolveUser(clerkID)
 	if err != nil {
@@ -74,20 +74,73 @@ func (uc *JobUseCase) ScheduleVisit(clerkID, jobID string, scheduledAt time.Time
 		return nil, err
 	}
 	if prof == nil || prof.ID != job.ProfessionalID {
-		return nil, errors.New("forbidden: only the professional can schedule the visit")
+		return nil, errors.New("forbidden: only the professional can propose a visit date")
 	}
-	if err := validateTransition(job.Status, domain.JobStatusVisitScheduled); err != nil {
+	if err := validateTransition(job.Status, domain.JobStatusVisitProposed); err != nil {
 		return nil, err
 	}
-	job.Status = domain.JobStatusVisitScheduled
+	job.Status = domain.JobStatusVisitProposed
 	job.VisitScheduledAt = &scheduledAt
 	job, err = uc.jobs.Update(job)
 	if err != nil {
 		return nil, err
 	}
-	uc.notify(job.ClientID, "job_visit_scheduled",
-		fmt.Sprintf("%s agendó la visita para el %s", job.ProfessionalName, scheduledAt.Format("02/01 15:04")))
+	uc.notify(job.ClientID, "job_visit_proposed",
+		fmt.Sprintf("%s propuso una visita para el %s. Confirmala desde la app.", job.ProfessionalName, scheduledAt.Format("02/01 15:04")))
 	_ = user
+	return job, nil
+}
+
+// ConfirmVisit: visit_proposed → visit_scheduled (client confirms the proposed date)
+func (uc *JobUseCase) ConfirmVisit(clerkID, jobID string) (*domain.Job, error) {
+	user, _, err := uc.resolveUser(clerkID)
+	if err != nil {
+		return nil, err
+	}
+	job, err := uc.jobs.FindByID(jobID)
+	if err != nil {
+		return nil, err
+	}
+	if user.ID != job.ClientID {
+		return nil, errors.New("forbidden: only the client can confirm the visit")
+	}
+	if err := validateTransition(job.Status, domain.JobStatusVisitScheduled); err != nil {
+		return nil, err
+	}
+	job.Status = domain.JobStatusVisitScheduled
+	job, err = uc.jobs.Update(job)
+	if err != nil {
+		return nil, err
+	}
+	uc.notify(job.ProfessionalUID, "job_visit_confirmed",
+		fmt.Sprintf("%s confirmó la visita.", job.ClientName))
+	return job, nil
+}
+
+// DeclineVisit: visit_proposed → pending_visit (client asks for a different date)
+func (uc *JobUseCase) DeclineVisit(clerkID, jobID string) (*domain.Job, error) {
+	user, _, err := uc.resolveUser(clerkID)
+	if err != nil {
+		return nil, err
+	}
+	job, err := uc.jobs.FindByID(jobID)
+	if err != nil {
+		return nil, err
+	}
+	if user.ID != job.ClientID {
+		return nil, errors.New("forbidden: only the client can decline the visit")
+	}
+	if err := validateTransition(job.Status, domain.JobStatusPendingVisit); err != nil {
+		return nil, err
+	}
+	job.Status = domain.JobStatusPendingVisit
+	job.VisitScheduledAt = nil
+	job, err = uc.jobs.Update(job)
+	if err != nil {
+		return nil, err
+	}
+	uc.notify(job.ProfessionalUID, "job_visit_declined",
+		fmt.Sprintf("%s rechazó la fecha propuesta. Proponé una nueva.", job.ClientName))
 	return job, nil
 }
 

@@ -89,6 +89,16 @@ func (h *JobHandler) PayVisit(c *gin.Context) {
 	h.respond(c, job, err)
 }
 
+func (h *JobHandler) ConfirmVisit(c *gin.Context) {
+	job, err := h.uc.ConfirmVisit(c.GetString("userId"), c.Param("id"))
+	h.respond(c, job, err)
+}
+
+func (h *JobHandler) DeclineVisit(c *gin.Context) {
+	job, err := h.uc.DeclineVisit(c.GetString("userId"), c.Param("id"))
+	h.respond(c, job, err)
+}
+
 func (h *JobHandler) CompleteVisit(c *gin.Context) {
 	job, err := h.uc.CompleteVisit(c.GetString("userId"), c.Param("id"))
 	h.respond(c, job, err)
