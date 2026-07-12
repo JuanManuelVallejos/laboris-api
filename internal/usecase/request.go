@@ -13,6 +13,7 @@ type RequestUseCase struct {
 	professionals domain.ProfessionalRepository
 	notifications *NotificationUseCase
 	jobs          domain.JobRepository
+	autoCloseDays int
 }
 
 func NewRequestUseCase(requests domain.RequestRepository, users domain.UserRepository, professionals domain.ProfessionalRepository) *RequestUseCase {
@@ -25,6 +26,10 @@ func (uc *RequestUseCase) SetNotifications(n *NotificationUseCase) {
 
 func (uc *RequestUseCase) SetJobRepository(jobs domain.JobRepository) {
 	uc.jobs = jobs
+}
+
+func (uc *RequestUseCase) SetAutoCloseDays(days int) {
+	uc.autoCloseDays = days
 }
 
 func (uc *RequestUseCase) Create(clerkID, professionalID, description string) (*domain.Request, error) {
@@ -70,6 +75,7 @@ func (uc *RequestUseCase) ListReceivedByProfessional(clerkID string) ([]domain.R
 	if prof == nil {
 		return nil, errors.New("professional profile not found")
 	}
+	_, _ = AutoCloseOverdueJobs(uc.jobs, uc.notifications, uc.autoCloseDays)
 	_ = uc.requests.MarkAllPendingAsViewed(prof.ID)
 	return uc.requests.FindByProfessionalID(prof.ID)
 }
@@ -82,6 +88,7 @@ func (uc *RequestUseCase) ListSentByClient(clerkID string) ([]domain.Request, er
 	if user == nil {
 		return nil, errors.New("user not found")
 	}
+	_, _ = AutoCloseOverdueJobs(uc.jobs, uc.notifications, uc.autoCloseDays)
 	return uc.requests.FindByClientID(user.ID)
 }
 

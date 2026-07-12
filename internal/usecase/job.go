@@ -15,6 +15,7 @@ type JobUseCase struct {
 	professionals domain.ProfessionalRepository
 	reworks       domain.ReworkRecordRepository
 	notifications *NotificationUseCase
+	autoCloseDays int
 }
 
 func NewJobUseCase(
@@ -31,6 +32,19 @@ func (uc *JobUseCase) SetNotifications(n *NotificationUseCase) {
 	uc.notifications = n
 }
 
+func (uc *JobUseCase) SetAutoCloseDays(days int) {
+	uc.autoCloseDays = days
+}
+
+// applyAutoCloseDeadline sets the (unpersisted) AutoCloseDeadline hint so the
+// frontend can show a countdown without needing to know the configured days.
+func applyAutoCloseDeadline(job *domain.Job, days int) {
+	if days > 0 && job.Status == domain.JobStatusWorkDelivered && job.WorkDeliveredAt != nil {
+		deadline := job.WorkDeliveredAt.Add(time.Duration(days) * 24 * time.Hour)
+		job.AutoCloseDeadline = &deadline
+	}
+}
+
 // CreateFromRequest is called by RequestUseCase when a request is accepted.
 func (uc *JobUseCase) CreateFromRequest(requestID, clientID, professionalID string) (*domain.Job, error) {
 	return uc.jobs.Create(&domain.Job{
@@ -45,6 +59,7 @@ func (uc *JobUseCase) GetByID(clerkID, jobID string) (*domain.Job, error) {
 	if err != nil {
 		return nil, err
 	}
+	_, _ = AutoCloseOverdueJobs(uc.jobs, uc.notifications, uc.autoCloseDays)
 	job, err := uc.jobs.FindByID(jobID)
 	if err != nil {
 		return nil, err
@@ -52,6 +67,7 @@ func (uc *JobUseCase) GetByID(clerkID, jobID string) (*domain.Job, error) {
 	if !uc.canAccess(user, job) {
 		return nil, errors.New("forbidden")
 	}
+	applyAutoCloseDeadline(job, uc.autoCloseDays)
 	return job, nil
 }
 
@@ -60,7 +76,15 @@ func (uc *JobUseCase) ListByUser(clerkID string) ([]domain.Job, error) {
 	if err != nil {
 		return nil, err
 	}
-	return uc.jobs.FindByUserID(user.ID)
+	_, _ = AutoCloseOverdueJobs(uc.jobs, uc.notifications, uc.autoCloseDays)
+	jobs, err := uc.jobs.FindByUserID(user.ID)
+	if err != nil {
+		return nil, err
+	}
+	for i := range jobs {
+		applyAutoCloseDeadline(&jobs[i], uc.autoCloseDays)
+	}
+	return jobs, nil
 }
 
 // ScheduleVisit: pending_visit → visit_proposed (professional proposes a date)
@@ -361,6 +385,8 @@ func (uc *JobUseCase) DeliverWork(clerkID, jobID string) (*domain.Job, error) {
 		return nil, err
 	}
 	job.Status = domain.JobStatusWorkDelivered
+	now := time.Now()
+	job.WorkDeliveredAt = &now
 	job, err = uc.jobs.Update(job)
 	if err != nil {
 		return nil, err

@@ -42,24 +42,29 @@ var ValidTransitions = map[string]map[string]bool{
 }
 
 type Job struct {
-	ID                string         `json:"id"`
-	RequestID         string         `json:"requestId"`
-	ClientID          string         `json:"clientId"`
-	ClientName        string         `json:"clientName"`
-	ProfessionalID    string         `json:"professionalId"`
-	ProfessionalName  string         `json:"professionalName"`
-	ProfessionalUID   string         `json:"-"` // professional's user_id — used for auth, not exposed
-	Status            string         `json:"status"`
-	VisitScheduledAt  *time.Time     `json:"visitScheduledAt,omitempty"`
-	VisitQuoteAmount  *float64       `json:"visitQuoteAmount,omitempty"`
-	WorkQuoteAmount   *float64       `json:"workQuoteAmount,omitempty"`
-	WorkDescription   string         `json:"workDescription,omitempty"`
-	ReworkCount       int            `json:"reworkCount"`
-	ReworkNotes       string         `json:"reworkNotes,omitempty"`
-	ReworkQuoteAmount *float64       `json:"reworkQuoteAmount,omitempty"`
-	CancelReason      string         `json:"cancelReason,omitempty"`
-	CompletedAt       *time.Time     `json:"completedAt,omitempty"`
-	CancelledAt       *time.Time     `json:"cancelledAt,omitempty"`
+	ID                string     `json:"id"`
+	RequestID         string     `json:"requestId"`
+	ClientID          string     `json:"clientId"`
+	ClientName        string     `json:"clientName"`
+	ProfessionalID    string     `json:"professionalId"`
+	ProfessionalName  string     `json:"professionalName"`
+	ProfessionalUID   string     `json:"-"` // professional's user_id — used for auth, not exposed
+	Status            string     `json:"status"`
+	VisitScheduledAt  *time.Time `json:"visitScheduledAt,omitempty"`
+	VisitQuoteAmount  *float64   `json:"visitQuoteAmount,omitempty"`
+	WorkQuoteAmount   *float64   `json:"workQuoteAmount,omitempty"`
+	WorkDescription   string     `json:"workDescription,omitempty"`
+	ReworkCount       int        `json:"reworkCount"`
+	ReworkNotes       string     `json:"reworkNotes,omitempty"`
+	ReworkQuoteAmount *float64   `json:"reworkQuoteAmount,omitempty"`
+	CancelReason      string     `json:"cancelReason,omitempty"`
+	CompletedAt       *time.Time `json:"completedAt,omitempty"`
+	CancelledAt       *time.Time `json:"cancelledAt,omitempty"`
+	WorkDeliveredAt   *time.Time `json:"workDeliveredAt,omitempty"`
+	AutoCompleted     bool       `json:"autoCompleted"`
+	// AutoCloseDeadline is computed on read (WorkDeliveredAt + configured grace
+	// period) and never persisted — it's not a column, just a convenience for callers.
+	AutoCloseDeadline *time.Time     `json:"autoCloseDeadline,omitempty"`
 	Payments          []Payment      `json:"payments"`
 	ReworkRecords     []ReworkRecord `json:"reworkRecords"`
 	CreatedAt         time.Time      `json:"createdAt"`
@@ -71,5 +76,6 @@ type JobRepository interface {
 	FindByID(id string) (*Job, error)
 	FindByUserID(userID string) ([]Job, error)
 	FindByRequestID(requestID string) (*Job, error)
+	FindOverdueDelivered(before time.Time) ([]Job, error)
 	Update(j *Job) (*Job, error)
 }

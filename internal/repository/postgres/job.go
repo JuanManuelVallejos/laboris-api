@@ -25,6 +25,7 @@ const jobSelectCols = `
 	j.work_description,   j.rework_count,       j.rework_notes,
 	j.rework_quote_amount,
 	j.cancel_reason,      j.completed_at,        j.cancelled_at,
+	j.work_delivered_at,  j.auto_completed,
 	j.created_at,         j.updated_at`
 
 const jobJoins = `
@@ -45,6 +46,7 @@ func scanJob(row interface{ Scan(...any) error }) (*domain.Job, error) {
 		cancelReason      *string
 		completedAt       *time.Time
 		cancelledAt       *time.Time
+		workDeliveredAt   *time.Time
 	)
 	if err := row.Scan(
 		&j.ID, &j.RequestID,
@@ -55,6 +57,7 @@ func scanJob(row interface{ Scan(...any) error }) (*domain.Job, error) {
 		&workDescription, &j.ReworkCount, &reworkNotes,
 		&reworkQuoteAmount,
 		&cancelReason, &completedAt, &cancelledAt,
+		&workDeliveredAt, &j.AutoCompleted,
 		&j.CreatedAt, &j.UpdatedAt,
 	); err != nil {
 		return nil, err
@@ -74,6 +77,7 @@ func scanJob(row interface{ Scan(...any) error }) (*domain.Job, error) {
 	}
 	j.CompletedAt = completedAt
 	j.CancelledAt = cancelledAt
+	j.WorkDeliveredAt = workDeliveredAt
 	j.Payments = []domain.Payment{}
 	j.ReworkRecords = []domain.ReworkRecord{}
 	return j, nil
@@ -157,6 +161,8 @@ func (r *JobRepository) Update(j *domain.Job) (*domain.Job, error) {
 			cancel_reason       = NULLIF($10,''),
 			completed_at        = $11,
 			cancelled_at        = $12,
+			work_delivered_at   = $13,
+			auto_completed      = $14,
 			updated_at          = NOW()
 		WHERE id = $1
 		RETURNING updated_at
@@ -166,8 +172,32 @@ func (r *JobRepository) Update(j *domain.Job) (*domain.Job, error) {
 		j.WorkDescription, j.ReworkCount, j.ReworkNotes,
 		j.ReworkQuoteAmount,
 		j.CancelReason, j.CompletedAt, j.CancelledAt,
+		j.WorkDeliveredAt, j.AutoCompleted,
 	).Scan(&j.UpdatedAt)
 	return j, err
+}
+
+func (r *JobRepository) FindOverdueDelivered(before time.Time) ([]domain.Job, error) {
+	rows, err := r.db.Query(context.Background(),
+		`SELECT `+jobSelectCols+jobJoins+`
+		 WHERE j.status = 'work_delivered' AND j.work_delivered_at IS NOT NULL AND j.work_delivered_at <= $1`, before)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var jobs []domain.Job
+	for rows.Next() {
+		j, err := scanJob(rows)
+		if err != nil {
+			return nil, err
+		}
+		jobs = append(jobs, *j)
+	}
+	if jobs == nil {
+		jobs = []domain.Job{}
+	}
+	return jobs, nil
 }
 
 func (r *JobRepository) fetchReworkRecords(jobID string) ([]domain.ReworkRecord, error) {

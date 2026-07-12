@@ -54,9 +54,11 @@ func main() {
 		reqUC := usecase.NewRequestUseCase(reqRepo, userRepo, profRepo)
 		reqUC.SetNotifications(notifUC)
 		reqUC.SetJobRepository(jobRepo)
+		reqUC.SetAutoCloseDays(cfg.JobAutoCloseDays)
 
 		jobUC := usecase.NewJobUseCase(jobRepo, payRepo, userRepo, profRepo, reworkRepo)
 		jobUC.SetNotifications(notifUC)
+		jobUC.SetAutoCloseDays(cfg.JobAutoCloseDays)
 
 		msgUC := usecase.NewMessageUseCase(msgRepo, reqRepo, userRepo, profRepo)
 
