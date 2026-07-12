@@ -394,11 +394,14 @@ func (uc *JobUseCase) RequestRework(clerkID, jobID string, notes string) (*domai
 		return nil, err
 	}
 	if uc.reworks != nil {
-		_, _ = uc.reworks.Create(&domain.ReworkRecord{
+		created, err := uc.reworks.Create(&domain.ReworkRecord{
 			JobID:       job.ID,
 			CycleNumber: job.ReworkCount,
 			Notes:       notes,
 		})
+		if err == nil {
+			job.ReworkRecords = append(job.ReworkRecords, *created)
+		}
 	}
 	msg := fmt.Sprintf("%s solicitó correcciones (retrabajo #%d)", job.ClientName, job.ReworkCount)
 	uc.notify(job.ProfessionalUID, "job_rework_requested", msg)
@@ -434,6 +437,12 @@ func (uc *JobUseCase) SubmitReworkQuote(clerkID, jobID string, amount float64) (
 	}
 	if uc.reworks != nil {
 		_ = uc.reworks.UpdateQuoteAmount(job.ID, job.ReworkCount, amount)
+	}
+	for i := range job.ReworkRecords {
+		if job.ReworkRecords[i].CycleNumber == job.ReworkCount {
+			job.ReworkRecords[i].QuoteAmount = &amount
+			break
+		}
 	}
 	uc.notify(job.ClientID, "job_rework_quoted",
 		fmt.Sprintf("%s cotizó las correcciones en $%.2f. Aprobá para retomar el trabajo.", job.ProfessionalName, amount))
