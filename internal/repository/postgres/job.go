@@ -172,7 +172,7 @@ func (r *JobRepository) Update(j *domain.Job) (*domain.Job, error) {
 
 func (r *JobRepository) fetchReworkRecords(jobID string) ([]domain.ReworkRecord, error) {
 	rows, err := r.db.Query(context.Background(), `
-		SELECT id, job_id, cycle_number, COALESCE(notes,''), quote_amount, created_at
+		SELECT id, job_id, cycle_number, COALESCE(notes,''), quote_amount, scheduled_at, created_at
 		FROM job_rework_records
 		WHERE job_id = $1
 		ORDER BY cycle_number ASC
@@ -185,10 +185,12 @@ func (r *JobRepository) fetchReworkRecords(jobID string) ([]domain.ReworkRecord,
 	for rows.Next() {
 		var rec domain.ReworkRecord
 		var quoteAmount *float64
-		if err := rows.Scan(&rec.ID, &rec.JobID, &rec.CycleNumber, &rec.Notes, &quoteAmount, &rec.CreatedAt); err != nil {
+		var scheduledAt *time.Time
+		if err := rows.Scan(&rec.ID, &rec.JobID, &rec.CycleNumber, &rec.Notes, &quoteAmount, &scheduledAt, &rec.CreatedAt); err != nil {
 			return nil, err
 		}
 		rec.QuoteAmount = quoteAmount
+		rec.ScheduledAt = scheduledAt
 		records = append(records, rec)
 	}
 	if records == nil {

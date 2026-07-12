@@ -440,7 +440,7 @@ func (uc *JobUseCase) SubmitReworkQuote(clerkID, jobID string, amount float64) (
 	return job, nil
 }
 
-// ApproveReworkQuote: rework_quoted → work_in_progress (client)
+// ApproveReworkQuote: rework_quoted → rework_accepted (client)
 func (uc *JobUseCase) ApproveReworkQuote(clerkID, jobID string) (*domain.Job, error) {
 	user, _, err := uc.resolveUser(clerkID)
 	if err != nil {
@@ -453,20 +453,20 @@ func (uc *JobUseCase) ApproveReworkQuote(clerkID, jobID string) (*domain.Job, er
 	if user.ID != job.ClientID {
 		return nil, errors.New("forbidden: only the client can approve the rework quote")
 	}
-	if err := validateTransition(job.Status, domain.JobStatusWorkInProgress); err != nil {
+	if err := validateTransition(job.Status, domain.JobStatusReworkAccepted); err != nil {
 		return nil, err
 	}
-	job.Status = domain.JobStatusWorkInProgress
+	job.Status = domain.JobStatusReworkAccepted
 	job, err = uc.jobs.Update(job)
 	if err != nil {
 		return nil, err
 	}
 	uc.notify(job.ProfessionalUID, "job_rework_quote_approved",
-		fmt.Sprintf("%s aprobó la cotización de correcciones. Retomá el trabajo.", job.ClientName))
+		fmt.Sprintf("%s aprobó la cotización de correcciones. Proponé una fecha para retomar el trabajo.", job.ClientName))
 	return job, nil
 }
 
-// AcceptRework: rework_requested → work_in_progress (professional, no extra cost)
+// AcceptRework: rework_requested → rework_accepted (professional, no extra cost)
 func (uc *JobUseCase) AcceptRework(clerkID, jobID string) (*domain.Job, error) {
 	_, prof, err := uc.resolveUser(clerkID)
 	if err != nil {
@@ -479,17 +479,113 @@ func (uc *JobUseCase) AcceptRework(clerkID, jobID string) (*domain.Job, error) {
 	if prof == nil || prof.ID != job.ProfessionalID {
 		return nil, errors.New("forbidden: only the professional can accept rework")
 	}
-	if err := validateTransition(job.Status, domain.JobStatusWorkInProgress); err != nil {
+	if err := validateTransition(job.Status, domain.JobStatusReworkAccepted); err != nil {
 		return nil, err
 	}
-	job.Status = domain.JobStatusWorkInProgress
+	job.Status = domain.JobStatusReworkAccepted
 	job.ReworkQuoteAmount = nil // no extra cost — clear any amount from a previous cycle
 	job, err = uc.jobs.Update(job)
 	if err != nil {
 		return nil, err
 	}
 	uc.notify(job.ClientID, "job_rework_accepted",
-		fmt.Sprintf("%s aceptó las correcciones y retomó el trabajo", job.ProfessionalName))
+		fmt.Sprintf("%s aceptó las correcciones sin costo extra. Va a proponer una fecha para retomar el trabajo.", job.ProfessionalName))
+	return job, nil
+}
+
+// ScheduleReworkVisit: rework_accepted → rework_visit_proposed (professional proposes a date)
+func (uc *JobUseCase) ScheduleReworkVisit(clerkID, jobID string, scheduledAt time.Time) (*domain.Job, error) {
+	_, prof, err := uc.resolveUser(clerkID)
+	if err != nil {
+		return nil, err
+	}
+	job, err := uc.jobs.FindByID(jobID)
+	if err != nil {
+		return nil, err
+	}
+	if prof == nil || prof.ID != job.ProfessionalID {
+		return nil, errors.New("forbidden: only the professional can propose a rework date")
+	}
+	if err := validateTransition(job.Status, domain.JobStatusReworkVisitProposed); err != nil {
+		return nil, err
+	}
+	job.Status = domain.JobStatusReworkVisitProposed
+	job, err = uc.jobs.Update(job)
+	if err != nil {
+		return nil, err
+	}
+	if uc.reworks != nil {
+		_ = uc.reworks.UpdateScheduledAt(job.ID, job.ReworkCount, &scheduledAt)
+	}
+	for i := range job.ReworkRecords {
+		if job.ReworkRecords[i].CycleNumber == job.ReworkCount {
+			job.ReworkRecords[i].ScheduledAt = &scheduledAt
+			break
+		}
+	}
+	uc.notify(job.ClientID, "job_rework_visit_proposed",
+		fmt.Sprintf("%s propuso el %s para retomar el trabajo. Confirmalo desde la app.", job.ProfessionalName, scheduledAt.Format("02/01 15:04")))
+	return job, nil
+}
+
+// ConfirmReworkVisit: rework_visit_proposed → work_in_progress (client confirms the proposed date)
+func (uc *JobUseCase) ConfirmReworkVisit(clerkID, jobID string) (*domain.Job, error) {
+	user, _, err := uc.resolveUser(clerkID)
+	if err != nil {
+		return nil, err
+	}
+	job, err := uc.jobs.FindByID(jobID)
+	if err != nil {
+		return nil, err
+	}
+	if user.ID != job.ClientID {
+		return nil, errors.New("forbidden: only the client can confirm the rework date")
+	}
+	if err := validateTransition(job.Status, domain.JobStatusWorkInProgress); err != nil {
+		return nil, err
+	}
+	job.Status = domain.JobStatusWorkInProgress
+	job, err = uc.jobs.Update(job)
+	if err != nil {
+		return nil, err
+	}
+	uc.notify(job.ProfessionalUID, "job_rework_visit_confirmed",
+		fmt.Sprintf("%s confirmó la fecha del retrabajo.", job.ClientName))
+	return job, nil
+}
+
+// DeclineReworkVisit: rework_visit_proposed → rework_accepted (client asks for a different date)
+func (uc *JobUseCase) DeclineReworkVisit(clerkID, jobID string) (*domain.Job, error) {
+	user, _, err := uc.resolveUser(clerkID)
+	if err != nil {
+		return nil, err
+	}
+	job, err := uc.jobs.FindByID(jobID)
+	if err != nil {
+		return nil, err
+	}
+	if user.ID != job.ClientID {
+		return nil, errors.New("forbidden: only the client can decline the rework date")
+	}
+	if err := validateTransition(job.Status, domain.JobStatusReworkAccepted); err != nil {
+		return nil, err
+	}
+	job.Status = domain.JobStatusReworkAccepted
+	job, err = uc.jobs.Update(job)
+	if err != nil {
+		return nil, err
+	}
+	if uc.reworks != nil {
+		_ = uc.reworks.UpdateScheduledAt(job.ID, job.ReworkCount, nil)
+	}
+	for i := range job.ReworkRecords {
+		if job.ReworkRecords[i].CycleNumber == job.ReworkCount {
+			job.ReworkRecords[i].ScheduledAt = nil
+			break
+		}
+	}
+	uc.notify(job.ProfessionalUID, "job_rework_visit_declined",
+		fmt.Sprintf("%s rechazó la fecha propuesta para el retrabajo. Proponé una nueva.", job.ClientName))
 	return job, nil
 }
 

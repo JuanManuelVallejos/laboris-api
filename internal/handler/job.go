@@ -165,6 +165,26 @@ func (h *JobHandler) AcceptRework(c *gin.Context) {
 	h.respond(c, job, err)
 }
 
+func (h *JobHandler) ScheduleReworkVisit(c *gin.Context) {
+	var body scheduleVisitBody
+	if err := c.ShouldBindJSON(&body); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	job, err := h.uc.ScheduleReworkVisit(c.GetString("userId"), c.Param("id"), body.ScheduledAt)
+	h.respond(c, job, err)
+}
+
+func (h *JobHandler) ConfirmReworkVisit(c *gin.Context) {
+	job, err := h.uc.ConfirmReworkVisit(c.GetString("userId"), c.Param("id"))
+	h.respond(c, job, err)
+}
+
+func (h *JobHandler) DeclineReworkVisit(c *gin.Context) {
+	job, err := h.uc.DeclineReworkVisit(c.GetString("userId"), c.Param("id"))
+	h.respond(c, job, err)
+}
+
 func (h *JobHandler) ApproveDelivery(c *gin.Context) {
 	job, err := h.uc.ApproveDelivery(c.GetString("userId"), c.Param("id"))
 	h.respond(c, job, err)

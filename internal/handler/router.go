@@ -69,6 +69,9 @@ func NewRouter(ph *ProfessionalHandler, oh *OnboardingHandler, mh *MeHandler, rh
 			priv.PATCH("/jobs/:id/rework-quote", jh.SubmitReworkQuote)
 			priv.PATCH("/jobs/:id/approve-rework-quote", jh.ApproveReworkQuote)
 			priv.PATCH("/jobs/:id/accept-rework", jh.AcceptRework)
+			priv.PATCH("/jobs/:id/schedule-rework-visit", jh.ScheduleReworkVisit)
+			priv.PATCH("/jobs/:id/confirm-rework-visit", jh.ConfirmReworkVisit)
+			priv.PATCH("/jobs/:id/decline-rework-visit", jh.DeclineReworkVisit)
 			priv.PATCH("/jobs/:id/approve-delivery", jh.ApproveDelivery)
 			priv.PATCH("/jobs/:id/cancel", jh.Cancel)
 
