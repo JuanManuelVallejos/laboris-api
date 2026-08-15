@@ -49,6 +49,7 @@ func NewRouter(ph *ProfessionalHandler, oh *OnboardingHandler, mh *MeHandler, rh
 			priv.GET("/me/notifications", nh.List)
 			priv.GET("/me/notifications/unread-count", nh.UnreadCount)
 			priv.POST("/me/notifications/read-all", nh.MarkAllRead)
+			priv.GET("/me/notifications/stream", nh.StreamNotifications)
 		}
 
 		if jh != nil {
@@ -77,6 +78,7 @@ func NewRouter(ph *ProfessionalHandler, oh *OnboardingHandler, mh *MeHandler, rh
 
 			priv.POST("/requests/:id/messages", jh.SendMessage)
 			priv.GET("/requests/:id/messages", jh.ListMessages)
+			priv.GET("/requests/:id/messages/stream", jh.StreamMessages)
 		}
 	}
 

@@ -43,3 +43,13 @@ func (h *NotificationHandler) MarkAllRead(c *gin.Context) {
 	}
 	c.Status(http.StatusNoContent)
 }
+
+func (h *NotificationHandler) StreamNotifications(c *gin.Context) {
+	ch, unsubscribe, err := h.uc.Subscribe(c.GetString("userId"))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	defer unsubscribe()
+	streamSSE(c, ch, "notification")
+}

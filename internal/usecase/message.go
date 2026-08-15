@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/laboris/laboris-api/internal/domain"
+	"github.com/laboris/laboris-api/internal/realtime"
 )
 
 type MessageUseCase struct {
@@ -13,6 +14,7 @@ type MessageUseCase struct {
 	users         domain.UserRepository
 	professionals domain.ProfessionalRepository
 	notifications *NotificationUseCase
+	hub           *realtime.Hub[*domain.Message]
 }
 
 func NewMessageUseCase(
@@ -26,6 +28,10 @@ func NewMessageUseCase(
 
 func (uc *MessageUseCase) SetNotifications(n *NotificationUseCase) {
 	uc.notifications = n
+}
+
+func (uc *MessageUseCase) SetHub(h *realtime.Hub[*domain.Message]) {
+	uc.hub = h
 }
 
 func (uc *MessageUseCase) Send(clerkID, requestID, content string) (*domain.Message, error) {
@@ -61,6 +67,10 @@ func (uc *MessageUseCase) Send(clerkID, requestID, content string) (*domain.Mess
 		return nil, err
 	}
 
+	if uc.hub != nil {
+		uc.hub.Publish(requestID, msg)
+	}
+
 	if uc.notifications != nil {
 		recipientUserID := req.ClientID
 		if isClient {
@@ -79,6 +89,28 @@ func (uc *MessageUseCase) Send(clerkID, requestID, content string) (*domain.Mess
 	}
 
 	return msg, nil
+}
+
+func (uc *MessageUseCase) Subscribe(clerkID, requestID string) (<-chan *domain.Message, func(), error) {
+	user, err := uc.users.FindByClerkID(clerkID)
+	if err != nil || user == nil {
+		return nil, nil, errors.New("user not found")
+	}
+	req, err := uc.requests.FindByID(requestID)
+	if err != nil || req == nil {
+		return nil, nil, errors.New("request not found")
+	}
+	prof, _ := uc.professionals.FindByUserID(user.ID)
+	isClient := user.ID == req.ClientID
+	isProfessional := prof != nil && prof.ID == req.ProfessionalID
+	if !isClient && !isProfessional {
+		return nil, nil, errors.New("forbidden")
+	}
+	if uc.hub == nil {
+		return nil, nil, errors.New("realtime not configured")
+	}
+	ch, unsub := uc.hub.Subscribe(requestID)
+	return ch, unsub, nil
 }
 
 func (uc *MessageUseCase) ListByRequest(clerkID, requestID string) ([]domain.Message, error) {

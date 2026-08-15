@@ -222,6 +222,16 @@ func (h *JobHandler) SendMessage(c *gin.Context) {
 	c.JSON(http.StatusCreated, msg)
 }
 
+func (h *JobHandler) StreamMessages(c *gin.Context) {
+	ch, unsubscribe, err := h.muc.Subscribe(c.GetString("userId"), c.Param("id"))
+	if err != nil {
+		c.JSON(httpStatus(err), gin.H{"error": err.Error()})
+		return
+	}
+	defer unsubscribe()
+	streamSSE(c, ch, "message")
+}
+
 func (h *JobHandler) ListMessages(c *gin.Context) {
 	msgs, err := h.muc.ListByRequest(c.GetString("userId"), c.Param("id"))
 	if err != nil {

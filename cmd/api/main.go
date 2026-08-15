@@ -8,7 +8,9 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/laboris/laboris-api/config"
 	"github.com/laboris/laboris-api/internal/db"
+	"github.com/laboris/laboris-api/internal/domain"
 	"github.com/laboris/laboris-api/internal/handler"
+	"github.com/laboris/laboris-api/internal/realtime"
 	repomemory "github.com/laboris/laboris-api/internal/repository/memory"
 	repopostgres "github.com/laboris/laboris-api/internal/repository/postgres"
 	"github.com/laboris/laboris-api/internal/usecase"
@@ -49,7 +51,11 @@ func main() {
 		payRepo := repopostgres.NewPaymentRepository(pool)
 		reworkRepo := repopostgres.NewReworkRecordRepository(pool)
 
+		messageHub := realtime.NewHub[*domain.Message]()
+		notificationHub := realtime.NewHub[*domain.Notification]()
+
 		notifUC := usecase.NewNotificationUseCase(notifRepo, userRepo)
+		notifUC.SetHub(notificationHub)
 
 		reqUC := usecase.NewRequestUseCase(reqRepo, userRepo, profRepo)
 		reqUC.SetNotifications(notifUC)
@@ -62,6 +68,7 @@ func main() {
 
 		msgUC := usecase.NewMessageUseCase(msgRepo, reqRepo, userRepo, profRepo)
 		msgUC.SetNotifications(notifUC)
+		msgUC.SetHub(messageHub)
 
 		ph = handler.NewProfessionalHandler(usecase.NewProfessionalUseCase(profRepo))
 		oh = handler.NewOnboardingHandler(usecase.NewOnboardingUseCase(userRepo, profRepo))
