@@ -16,12 +16,20 @@ func NewNotificationRepository(db *pgxpool.Pool) *NotificationRepository {
 }
 
 func (r *NotificationRepository) Create(n *domain.Notification) (*domain.Notification, error) {
+	// entity_id is a UUID column — binding it through NULLIF($4, '') makes
+	// Postgres try to cast the literal '' to uuid at prepare time and fail
+	// with "invalid input syntax for type uuid" on every insert. Pass a real
+	// nil instead so pgx sends SQL NULL directly when there's no entity.
+	var entityIDParam *string
+	if n.EntityID != "" {
+		entityIDParam = &n.EntityID
+	}
 	var entityID *string
 	err := r.db.QueryRow(context.Background(), `
 		INSERT INTO notifications (user_id, type, message, entity_id)
-		VALUES ($1, $2, $3, NULLIF($4, ''))
+		VALUES ($1, $2, $3, $4)
 		RETURNING id, user_id, type, message, entity_id, read, created_at
-	`, n.UserID, n.Type, n.Message, n.EntityID).Scan(&n.ID, &n.UserID, &n.Type, &n.Message, &entityID, &n.Read, &n.CreatedAt)
+	`, n.UserID, n.Type, n.Message, entityIDParam).Scan(&n.ID, &n.UserID, &n.Type, &n.Message, &entityID, &n.Read, &n.CreatedAt)
 	if entityID != nil {
 		n.EntityID = *entityID
 	}
