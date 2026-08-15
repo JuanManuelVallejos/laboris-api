@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/laboris/laboris-api/internal/domain"
 )
@@ -11,6 +12,7 @@ type MessageUseCase struct {
 	requests      domain.RequestRepository
 	users         domain.UserRepository
 	professionals domain.ProfessionalRepository
+	notifications *NotificationUseCase
 }
 
 func NewMessageUseCase(
@@ -20,6 +22,10 @@ func NewMessageUseCase(
 	professionals domain.ProfessionalRepository,
 ) *MessageUseCase {
 	return &MessageUseCase{messages: messages, requests: requests, users: users, professionals: professionals}
+}
+
+func (uc *MessageUseCase) SetNotifications(n *NotificationUseCase) {
+	uc.notifications = n
 }
 
 func (uc *MessageUseCase) Send(clerkID, requestID, content string) (*domain.Message, error) {
@@ -45,12 +51,34 @@ func (uc *MessageUseCase) Send(clerkID, requestID, content string) (*domain.Mess
 		return nil, errors.New("forbidden: only the client or professional can send messages")
 	}
 
-	return uc.messages.Create(&domain.Message{
+	msg, err := uc.messages.Create(&domain.Message{
 		RequestID:  requestID,
 		SenderID:   user.ID,
 		SenderName: user.FullName,
 		Content:    content,
 	})
+	if err != nil {
+		return nil, err
+	}
+
+	if uc.notifications != nil {
+		recipientUserID := req.ClientID
+		if isClient {
+			if prof == nil {
+				prof, _ = uc.professionals.FindByID(req.ProfessionalID)
+			}
+			recipientUserID = ""
+			if prof != nil {
+				recipientUserID = prof.UserID
+			}
+		}
+		if recipientUserID != "" && recipientUserID != user.ID {
+			_ = uc.notifications.CreateForUser(recipientUserID, "job_new_message",
+				fmt.Sprintf("%s te envió un mensaje", user.FullName), req.JobID)
+		}
+	}
+
+	return msg, nil
 }
 
 func (uc *MessageUseCase) ListByRequest(clerkID, requestID string) ([]domain.Message, error) {

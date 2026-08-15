@@ -7,6 +7,7 @@ type Notification struct {
 	UserID    string    `json:"userId"`
 	Type      string    `json:"type"`
 	Message   string    `json:"message"`
+	EntityID  string    `json:"entityId,omitempty"`
 	Read      bool      `json:"read"`
 	CreatedAt time.Time `json:"createdAt"`
 }

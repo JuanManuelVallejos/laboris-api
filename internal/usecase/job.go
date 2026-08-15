@@ -87,11 +87,14 @@ func (uc *JobUseCase) ListByUser(clerkID string) ([]domain.Job, error) {
 	return jobs, nil
 }
 
-// ScheduleVisit: pending_visit → visit_proposed (professional proposes a date)
-func (uc *JobUseCase) ScheduleVisit(clerkID, jobID string, scheduledAt time.Time) (*domain.Job, error) {
+// ScheduleVisit: pending_visit → visit_proposed (professional proposes a date, optionally with a quote)
+func (uc *JobUseCase) ScheduleVisit(clerkID, jobID string, scheduledAt time.Time, quoteAmount *float64) (*domain.Job, error) {
 	user, prof, err := uc.resolveUser(clerkID)
 	if err != nil {
 		return nil, err
+	}
+	if !scheduledAt.After(time.Now()) {
+		return nil, errors.New("scheduledAt must be in the future")
 	}
 	job, err := uc.jobs.FindByID(jobID)
 	if err != nil {
@@ -105,17 +108,22 @@ func (uc *JobUseCase) ScheduleVisit(clerkID, jobID string, scheduledAt time.Time
 	}
 	job.Status = domain.JobStatusVisitProposed
 	job.VisitScheduledAt = &scheduledAt
+	job.VisitQuoteAmount = quoteAmount
 	job, err = uc.jobs.Update(job)
 	if err != nil {
 		return nil, err
 	}
-	uc.notify(job.ClientID, "job_visit_proposed",
-		fmt.Sprintf("%s propuso una visita para el %s. Confirmala desde la app.", job.ProfessionalName, scheduledAt.Format("02/01 15:04")))
+	msg := fmt.Sprintf("%s propuso una visita para el %s.", job.ProfessionalName, scheduledAt.Format("02/01 15:04"))
+	if quoteAmount != nil {
+		msg = fmt.Sprintf("%s propuso una visita para el %s, con un costo de $%.2f.", job.ProfessionalName, scheduledAt.Format("02/01 15:04"), *quoteAmount)
+	}
+	uc.notify(job.ClientID, "job_visit_proposed", msg+" Revisala y confirmala desde la app.", job.ID)
 	_ = user
 	return job, nil
 }
 
-// ConfirmVisit: visit_proposed → visit_scheduled (client confirms the proposed date)
+// ConfirmVisit: visit_proposed → visit_scheduled (no quote proposed) or visit_quoted (quote proposed) —
+// client confirms date and quote (if any) together, in a single approval step.
 func (uc *JobUseCase) ConfirmVisit(clerkID, jobID string) (*domain.Job, error) {
 	user, _, err := uc.resolveUser(clerkID)
 	if err != nil {
@@ -128,20 +136,27 @@ func (uc *JobUseCase) ConfirmVisit(clerkID, jobID string) (*domain.Job, error) {
 	if user.ID != job.ClientID {
 		return nil, errors.New("forbidden: only the client can confirm the visit")
 	}
-	if err := validateTransition(job.Status, domain.JobStatusVisitScheduled); err != nil {
+	target := domain.JobStatusVisitScheduled
+	if job.VisitQuoteAmount != nil {
+		target = domain.JobStatusVisitQuoted
+	}
+	if err := validateTransition(job.Status, target); err != nil {
 		return nil, err
 	}
-	job.Status = domain.JobStatusVisitScheduled
+	job.Status = target
 	job, err = uc.jobs.Update(job)
 	if err != nil {
 		return nil, err
 	}
-	uc.notify(job.ProfessionalUID, "job_visit_confirmed",
-		fmt.Sprintf("%s confirmó la visita.", job.ClientName))
+	msg := fmt.Sprintf("%s confirmó la visita.", job.ClientName)
+	if target == domain.JobStatusVisitQuoted {
+		msg = fmt.Sprintf("%s confirmó la visita y la cotización ($%.2f). Queda pendiente el pago.", job.ClientName, *job.VisitQuoteAmount)
+	}
+	uc.notify(job.ProfessionalUID, "job_visit_confirmed", msg, job.ID)
 	return job, nil
 }
 
-// DeclineVisit: visit_proposed → pending_visit (client asks for a different date)
+// DeclineVisit: visit_proposed → pending_visit (client asks for a different date/quote)
 func (uc *JobUseCase) DeclineVisit(clerkID, jobID string) (*domain.Job, error) {
 	user, _, err := uc.resolveUser(clerkID)
 	if err != nil {
@@ -159,12 +174,13 @@ func (uc *JobUseCase) DeclineVisit(clerkID, jobID string) (*domain.Job, error) {
 	}
 	job.Status = domain.JobStatusPendingVisit
 	job.VisitScheduledAt = nil
+	job.VisitQuoteAmount = nil
 	job, err = uc.jobs.Update(job)
 	if err != nil {
 		return nil, err
 	}
 	uc.notify(job.ProfessionalUID, "job_visit_declined",
-		fmt.Sprintf("%s rechazó la fecha propuesta. Proponé una nueva.", job.ClientName))
+		fmt.Sprintf("%s rechazó la propuesta de visita. Proponé una nueva.", job.ClientName), job.ID)
 	return job, nil
 }
 
@@ -191,7 +207,7 @@ func (uc *JobUseCase) SubmitVisitQuote(clerkID, jobID string, amount float64) (*
 		return nil, err
 	}
 	uc.notify(job.ClientID, "job_visit_quoted",
-		fmt.Sprintf("%s envió la cotización de visita: $%.2f", job.ProfessionalName, amount))
+		fmt.Sprintf("%s envió la cotización de visita: $%.2f", job.ProfessionalName, amount), job.ID)
 	return job, nil
 }
 
@@ -221,7 +237,7 @@ func (uc *JobUseCase) SkipVisit(clerkID, jobID string, workAmount float64, workD
 		return nil, err
 	}
 	uc.notify(job.ClientID, "job_work_quoted",
-		fmt.Sprintf("%s envió cotización del trabajo: $%.2f", job.ProfessionalName, workAmount))
+		fmt.Sprintf("%s envió cotización del trabajo: $%.2f", job.ProfessionalName, workAmount), job.ID)
 	return job, nil
 }
 
@@ -258,7 +274,7 @@ func (uc *JobUseCase) PayVisit(clerkID, jobID string) (*domain.Job, error) {
 		Provider: "mock",
 	})
 	uc.notify(job.ProfessionalUID, "job_visit_paid",
-		fmt.Sprintf("%s pagó la visita ($%.2f)", job.ClientName, amount))
+		fmt.Sprintf("%s pagó la visita ($%.2f)", job.ClientName, amount), job.ID)
 	return job, nil
 }
 
@@ -284,7 +300,7 @@ func (uc *JobUseCase) CompleteVisit(clerkID, jobID string) (*domain.Job, error) 
 		return nil, err
 	}
 	uc.notify(job.ClientID, "job_visit_completed",
-		fmt.Sprintf("%s confirmó que realizó la visita", job.ProfessionalName))
+		fmt.Sprintf("%s confirmó que realizó la visita", job.ProfessionalName), job.ID)
 	return job, nil
 }
 
@@ -312,7 +328,7 @@ func (uc *JobUseCase) SubmitWorkQuote(clerkID, jobID string, amount float64, des
 		return nil, err
 	}
 	uc.notify(job.ClientID, "job_work_quoted",
-		fmt.Sprintf("%s envió cotización del trabajo: $%.2f", job.ProfessionalName, amount))
+		fmt.Sprintf("%s envió cotización del trabajo: $%.2f", job.ProfessionalName, amount), job.ID)
 	return job, nil
 }
 
@@ -338,7 +354,7 @@ func (uc *JobUseCase) ApproveWorkQuote(clerkID, jobID string) (*domain.Job, erro
 		return nil, err
 	}
 	uc.notify(job.ProfessionalUID, "job_work_approved",
-		fmt.Sprintf("%s aprobó la cotización del trabajo", job.ClientName))
+		fmt.Sprintf("%s aprobó la cotización del trabajo", job.ClientName), job.ID)
 	return job, nil
 }
 
@@ -364,7 +380,7 @@ func (uc *JobUseCase) StartWork(clerkID, jobID string) (*domain.Job, error) {
 		return nil, err
 	}
 	uc.notify(job.ClientID, "job_work_in_progress",
-		fmt.Sprintf("%s comenzó el trabajo", job.ProfessionalName))
+		fmt.Sprintf("%s comenzó el trabajo", job.ProfessionalName), job.ID)
 	return job, nil
 }
 
@@ -392,7 +408,7 @@ func (uc *JobUseCase) DeliverWork(clerkID, jobID string) (*domain.Job, error) {
 		return nil, err
 	}
 	uc.notify(job.ClientID, "job_work_delivered",
-		fmt.Sprintf("%s marcó el trabajo como entregado. Revisá y aprobá o pedí correcciones.", job.ProfessionalName))
+		fmt.Sprintf("%s marcó el trabajo como entregado. Revisá y aprobá o pedí correcciones.", job.ProfessionalName), job.ID)
 	return job, nil
 }
 
@@ -430,11 +446,11 @@ func (uc *JobUseCase) RequestRework(clerkID, jobID string, notes string) (*domai
 		}
 	}
 	msg := fmt.Sprintf("%s solicitó correcciones (retrabajo #%d)", job.ClientName, job.ReworkCount)
-	uc.notify(job.ProfessionalUID, "job_rework_requested", msg)
+	uc.notify(job.ProfessionalUID, "job_rework_requested", msg, job.ID)
 	if job.ReworkCount > 2 {
 		// notify admin users — for now notify professional as well with escalation flag
 		uc.notify(job.ProfessionalUID, "job_rework_escalated",
-			fmt.Sprintf("El trabajo lleva %d retrabajos. Un admin puede mediar si es necesario.", job.ReworkCount))
+			fmt.Sprintf("El trabajo lleva %d retrabajos. Un admin puede mediar si es necesario.", job.ReworkCount), job.ID)
 	}
 	return job, nil
 }
@@ -471,7 +487,7 @@ func (uc *JobUseCase) SubmitReworkQuote(clerkID, jobID string, amount float64) (
 		}
 	}
 	uc.notify(job.ClientID, "job_rework_quoted",
-		fmt.Sprintf("%s cotizó las correcciones en $%.2f. Aprobá para retomar el trabajo.", job.ProfessionalName, amount))
+		fmt.Sprintf("%s cotizó las correcciones en $%.2f. Aprobá para retomar el trabajo.", job.ProfessionalName, amount), job.ID)
 	return job, nil
 }
 
@@ -497,7 +513,7 @@ func (uc *JobUseCase) ApproveReworkQuote(clerkID, jobID string) (*domain.Job, er
 		return nil, err
 	}
 	uc.notify(job.ProfessionalUID, "job_rework_quote_approved",
-		fmt.Sprintf("%s aprobó la cotización de correcciones. Proponé una fecha para retomar el trabajo.", job.ClientName))
+		fmt.Sprintf("%s aprobó la cotización de correcciones. Proponé una fecha para retomar el trabajo.", job.ClientName), job.ID)
 	return job, nil
 }
 
@@ -523,8 +539,17 @@ func (uc *JobUseCase) AcceptRework(clerkID, jobID string) (*domain.Job, error) {
 	if err != nil {
 		return nil, err
 	}
+	if uc.reworks != nil {
+		_ = uc.reworks.MarkNoCharge(job.ID, job.ReworkCount)
+	}
+	for i := range job.ReworkRecords {
+		if job.ReworkRecords[i].CycleNumber == job.ReworkCount {
+			job.ReworkRecords[i].NoCharge = true
+			break
+		}
+	}
 	uc.notify(job.ClientID, "job_rework_accepted",
-		fmt.Sprintf("%s aceptó las correcciones sin costo extra. Va a proponer una fecha para retomar el trabajo.", job.ProfessionalName))
+		fmt.Sprintf("%s aceptó las correcciones sin costo extra. Va a proponer una fecha para retomar el trabajo.", job.ProfessionalName), job.ID)
 	return job, nil
 }
 
@@ -533,6 +558,9 @@ func (uc *JobUseCase) ScheduleReworkVisit(clerkID, jobID string, scheduledAt tim
 	_, prof, err := uc.resolveUser(clerkID)
 	if err != nil {
 		return nil, err
+	}
+	if !scheduledAt.After(time.Now()) {
+		return nil, errors.New("scheduledAt must be in the future")
 	}
 	job, err := uc.jobs.FindByID(jobID)
 	if err != nil {
@@ -559,7 +587,7 @@ func (uc *JobUseCase) ScheduleReworkVisit(clerkID, jobID string, scheduledAt tim
 		}
 	}
 	uc.notify(job.ClientID, "job_rework_visit_proposed",
-		fmt.Sprintf("%s propuso el %s para retomar el trabajo. Confirmalo desde la app.", job.ProfessionalName, scheduledAt.Format("02/01 15:04")))
+		fmt.Sprintf("%s propuso el %s para retomar el trabajo. Confirmalo desde la app.", job.ProfessionalName, scheduledAt.Format("02/01 15:04")), job.ID)
 	return job, nil
 }
 
@@ -585,7 +613,7 @@ func (uc *JobUseCase) ConfirmReworkVisit(clerkID, jobID string) (*domain.Job, er
 		return nil, err
 	}
 	uc.notify(job.ProfessionalUID, "job_rework_visit_confirmed",
-		fmt.Sprintf("%s confirmó la fecha del retrabajo.", job.ClientName))
+		fmt.Sprintf("%s confirmó la fecha del retrabajo.", job.ClientName), job.ID)
 	return job, nil
 }
 
@@ -620,7 +648,7 @@ func (uc *JobUseCase) DeclineReworkVisit(clerkID, jobID string) (*domain.Job, er
 		}
 	}
 	uc.notify(job.ProfessionalUID, "job_rework_visit_declined",
-		fmt.Sprintf("%s rechazó la fecha propuesta para el retrabajo. Proponé una nueva.", job.ClientName))
+		fmt.Sprintf("%s rechazó la fecha propuesta para el retrabajo. Proponé una nueva.", job.ClientName), job.ID)
 	return job, nil
 }
 
@@ -659,7 +687,7 @@ func (uc *JobUseCase) ApproveDelivery(clerkID, jobID string) (*domain.Job, error
 		Provider: "mock",
 	})
 	uc.notify(job.ProfessionalUID, "job_completed",
-		fmt.Sprintf("%s aprobó el trabajo. El pago fue liberado ($%.2f).", job.ClientName, amount))
+		fmt.Sprintf("%s aprobó el trabajo. El pago fue liberado ($%.2f).", job.ClientName, amount), job.ID)
 	return job, nil
 }
 
@@ -694,7 +722,7 @@ func (uc *JobUseCase) Cancel(clerkID, jobID string, reason string) (*domain.Job,
 		notifyID = job.ClientID
 	}
 	uc.notify(notifyID, "job_cancelled",
-		fmt.Sprintf("%s canceló el trabajo. Motivo: %s", cancellerName, reason))
+		fmt.Sprintf("%s canceló el trabajo. Motivo: %s", cancellerName, reason), job.ID)
 	return job, nil
 }
 
@@ -713,9 +741,9 @@ func (uc *JobUseCase) canAccess(user *domain.User, job *domain.Job) bool {
 	return user.ID == job.ClientID || user.ID == job.ProfessionalUID
 }
 
-func (uc *JobUseCase) notify(userID, notifType, message string) {
+func (uc *JobUseCase) notify(userID, notifType, message, entityID string) {
 	if uc.notifications != nil && userID != "" {
-		_ = uc.notifications.CreateForUser(userID, notifType, message)
+		_ = uc.notifications.CreateForUser(userID, notifType, message, entityID)
 	}
 }
 

@@ -33,8 +33,8 @@ func AutoCloseOverdueJobs(jobs domain.JobRepository, notifications *Notification
 		closed++
 		if notifications != nil {
 			msg := "El trabajo se marcó como completado automáticamente porque no se confirmó la entrega a tiempo."
-			_ = notifications.CreateForUser(job.ClientID, "job_auto_completed", msg)
-			_ = notifications.CreateForUser(job.ProfessionalUID, "job_auto_completed", msg)
+			_ = notifications.CreateForUser(job.ClientID, "job_auto_completed", msg, job.ID)
+			_ = notifications.CreateForUser(job.ProfessionalUID, "job_auto_completed", msg, job.ID)
 		}
 	}
 	return closed, nil

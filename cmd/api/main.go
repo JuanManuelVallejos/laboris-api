@@ -61,6 +61,7 @@ func main() {
 		jobUC.SetAutoCloseDays(cfg.JobAutoCloseDays)
 
 		msgUC := usecase.NewMessageUseCase(msgRepo, reqRepo, userRepo, profRepo)
+		msgUC.SetNotifications(notifUC)
 
 		ph = handler.NewProfessionalHandler(usecase.NewProfessionalUseCase(profRepo))
 		oh = handler.NewOnboardingHandler(usecase.NewOnboardingUseCase(userRepo, profRepo))

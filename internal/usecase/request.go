@@ -53,7 +53,7 @@ func (uc *RequestUseCase) Create(clerkID, professionalID, description string) (*
 		prof, lookupErr := uc.professionals.FindByID(professionalID)
 		if lookupErr == nil && prof != nil {
 			msg := fmt.Sprintf("Nueva solicitud de %s", user.FullName)
-			_ = uc.notifications.CreateForUser(prof.UserID, "new_request", msg)
+			_ = uc.notifications.CreateForUser(prof.UserID, "new_request", msg, req.ID)
 		}
 	}
 
@@ -104,6 +104,19 @@ func (uc *RequestUseCase) UpdateStatus(id, status, reason string) (*domain.Reque
 		return nil, err
 	}
 
+	var jobID string
+	if status == "accepted" && uc.jobs != nil {
+		job, jerr := uc.jobs.Create(&domain.Job{
+			RequestID:      rq.ID,
+			ClientID:       rq.ClientID,
+			ProfessionalID: rq.ProfessionalID,
+		})
+		if jerr == nil && job != nil {
+			jobID = job.ID
+			rq.JobID = jobID
+		}
+	}
+
 	if uc.notifications != nil && uc.professionals != nil {
 		prof, lookupErr := uc.professionals.FindByID(rq.ProfessionalID)
 		if lookupErr == nil && prof != nil {
@@ -113,16 +126,8 @@ func (uc *RequestUseCase) UpdateStatus(id, status, reason string) (*domain.Reque
 			} else {
 				msg = fmt.Sprintf("%s rechazó tu solicitud", prof.Name)
 			}
-			_ = uc.notifications.CreateForUser(rq.ClientID, "request_"+status, msg)
+			_ = uc.notifications.CreateForUser(rq.ClientID, "request_"+status, msg, jobID)
 		}
-	}
-
-	if status == "accepted" && uc.jobs != nil {
-		_, _ = uc.jobs.Create(&domain.Job{
-			RequestID:      rq.ID,
-			ClientID:       rq.ClientID,
-			ProfessionalID: rq.ProfessionalID,
-		})
 	}
 
 	return rq, nil

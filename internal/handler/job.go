@@ -43,6 +43,7 @@ func (h *JobHandler) ListMyJobs(c *gin.Context) {
 
 type scheduleVisitBody struct {
 	ScheduledAt time.Time `json:"scheduledAt" binding:"required"`
+	QuoteAmount *float64  `json:"quoteAmount"`
 }
 
 func (h *JobHandler) ScheduleVisit(c *gin.Context) {
@@ -51,7 +52,7 @@ func (h *JobHandler) ScheduleVisit(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	job, err := h.uc.ScheduleVisit(c.GetString("userId"), c.Param("id"), body.ScheduledAt)
+	job, err := h.uc.ScheduleVisit(c.GetString("userId"), c.Param("id"), body.ScheduledAt, body.QuoteAmount)
 	h.respond(c, job, err)
 }
 

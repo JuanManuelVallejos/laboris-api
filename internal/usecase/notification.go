@@ -15,11 +15,12 @@ func NewNotificationUseCase(repo domain.NotificationRepository, users domain.Use
 	return &NotificationUseCase{repo: repo, users: users}
 }
 
-func (uc *NotificationUseCase) CreateForUser(userID, notifType, message string) error {
+func (uc *NotificationUseCase) CreateForUser(userID, notifType, message, entityID string) error {
 	_, err := uc.repo.Create(&domain.Notification{
-		UserID:  userID,
-		Type:    notifType,
-		Message: message,
+		UserID:   userID,
+		Type:     notifType,
+		Message:  message,
+		EntityID: entityID,
 	})
 	return err
 }
