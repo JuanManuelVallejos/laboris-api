@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/laboris/laboris-api/internal/domain"
+	"github.com/laboris/laboris-api/internal/realtime"
 )
 
 type JobUseCase struct {
@@ -15,6 +16,7 @@ type JobUseCase struct {
 	professionals domain.ProfessionalRepository
 	reworks       domain.ReworkRecordRepository
 	notifications *NotificationUseCase
+	hub           *realtime.Hub[*domain.Job]
 	autoCloseDays int
 }
 
@@ -30,6 +32,10 @@ func NewJobUseCase(
 
 func (uc *JobUseCase) SetNotifications(n *NotificationUseCase) {
 	uc.notifications = n
+}
+
+func (uc *JobUseCase) SetHub(h *realtime.Hub[*domain.Job]) {
+	uc.hub = h
 }
 
 func (uc *JobUseCase) SetAutoCloseDays(days int) {
@@ -109,7 +115,7 @@ func (uc *JobUseCase) ScheduleVisit(clerkID, jobID string, scheduledAt time.Time
 	job.Status = domain.JobStatusVisitProposed
 	job.VisitScheduledAt = &scheduledAt
 	job.VisitQuoteAmount = quoteAmount
-	job, err = uc.jobs.Update(job)
+	job, err = uc.updateJob(job)
 	if err != nil {
 		return nil, err
 	}
@@ -144,7 +150,7 @@ func (uc *JobUseCase) ConfirmVisit(clerkID, jobID string) (*domain.Job, error) {
 		return nil, err
 	}
 	job.Status = target
-	job, err = uc.jobs.Update(job)
+	job, err = uc.updateJob(job)
 	if err != nil {
 		return nil, err
 	}
@@ -175,7 +181,7 @@ func (uc *JobUseCase) DeclineVisit(clerkID, jobID string) (*domain.Job, error) {
 	job.Status = domain.JobStatusPendingVisit
 	job.VisitScheduledAt = nil
 	job.VisitQuoteAmount = nil
-	job, err = uc.jobs.Update(job)
+	job, err = uc.updateJob(job)
 	if err != nil {
 		return nil, err
 	}
@@ -202,7 +208,7 @@ func (uc *JobUseCase) SubmitVisitQuote(clerkID, jobID string, amount float64) (*
 	}
 	job.Status = domain.JobStatusVisitQuoted
 	job.VisitQuoteAmount = &amount
-	job, err = uc.jobs.Update(job)
+	job, err = uc.updateJob(job)
 	if err != nil {
 		return nil, err
 	}
@@ -232,7 +238,7 @@ func (uc *JobUseCase) SkipVisit(clerkID, jobID string, workAmount float64, workD
 	job.VisitQuoteAmount = &zero
 	job.WorkQuoteAmount = &workAmount
 	job.WorkDescription = workDescription
-	job, err = uc.jobs.Update(job)
+	job, err = uc.updateJob(job)
 	if err != nil {
 		return nil, err
 	}
@@ -258,7 +264,7 @@ func (uc *JobUseCase) PayVisit(clerkID, jobID string) (*domain.Job, error) {
 		return nil, err
 	}
 	job.Status = domain.JobStatusVisitPaid
-	job, err = uc.jobs.Update(job)
+	job, err = uc.updateJob(job)
 	if err != nil {
 		return nil, err
 	}
@@ -295,7 +301,7 @@ func (uc *JobUseCase) CompleteVisit(clerkID, jobID string) (*domain.Job, error) 
 		return nil, err
 	}
 	job.Status = domain.JobStatusVisitCompleted
-	job, err = uc.jobs.Update(job)
+	job, err = uc.updateJob(job)
 	if err != nil {
 		return nil, err
 	}
@@ -323,7 +329,7 @@ func (uc *JobUseCase) SubmitWorkQuote(clerkID, jobID string, amount float64, des
 	job.Status = domain.JobStatusWorkQuoted
 	job.WorkQuoteAmount = &amount
 	job.WorkDescription = description
-	job, err = uc.jobs.Update(job)
+	job, err = uc.updateJob(job)
 	if err != nil {
 		return nil, err
 	}
@@ -349,7 +355,7 @@ func (uc *JobUseCase) ApproveWorkQuote(clerkID, jobID string) (*domain.Job, erro
 		return nil, err
 	}
 	job.Status = domain.JobStatusWorkApproved
-	job, err = uc.jobs.Update(job)
+	job, err = uc.updateJob(job)
 	if err != nil {
 		return nil, err
 	}
@@ -375,7 +381,7 @@ func (uc *JobUseCase) StartWork(clerkID, jobID string) (*domain.Job, error) {
 		return nil, err
 	}
 	job.Status = domain.JobStatusWorkInProgress
-	job, err = uc.jobs.Update(job)
+	job, err = uc.updateJob(job)
 	if err != nil {
 		return nil, err
 	}
@@ -403,7 +409,7 @@ func (uc *JobUseCase) DeliverWork(clerkID, jobID string) (*domain.Job, error) {
 	job.Status = domain.JobStatusWorkDelivered
 	now := time.Now()
 	job.WorkDeliveredAt = &now
-	job, err = uc.jobs.Update(job)
+	job, err = uc.updateJob(job)
 	if err != nil {
 		return nil, err
 	}
@@ -431,7 +437,7 @@ func (uc *JobUseCase) RequestRework(clerkID, jobID string, notes string) (*domai
 	job.Status = domain.JobStatusReworkRequested
 	job.ReworkCount++
 	job.ReworkNotes = notes
-	job, err = uc.jobs.Update(job)
+	job, err = uc.updateJob(job)
 	if err != nil {
 		return nil, err
 	}
@@ -473,7 +479,7 @@ func (uc *JobUseCase) SubmitReworkQuote(clerkID, jobID string, amount float64) (
 	}
 	job.Status = domain.JobStatusReworkQuoted
 	job.ReworkQuoteAmount = &amount
-	job, err = uc.jobs.Update(job)
+	job, err = uc.updateJob(job)
 	if err != nil {
 		return nil, err
 	}
@@ -508,7 +514,7 @@ func (uc *JobUseCase) ApproveReworkQuote(clerkID, jobID string) (*domain.Job, er
 		return nil, err
 	}
 	job.Status = domain.JobStatusReworkAccepted
-	job, err = uc.jobs.Update(job)
+	job, err = uc.updateJob(job)
 	if err != nil {
 		return nil, err
 	}
@@ -535,7 +541,7 @@ func (uc *JobUseCase) AcceptRework(clerkID, jobID string) (*domain.Job, error) {
 	}
 	job.Status = domain.JobStatusReworkAccepted
 	job.ReworkQuoteAmount = nil // no extra cost — clear any amount from a previous cycle
-	job, err = uc.jobs.Update(job)
+	job, err = uc.updateJob(job)
 	if err != nil {
 		return nil, err
 	}
@@ -573,7 +579,7 @@ func (uc *JobUseCase) ScheduleReworkVisit(clerkID, jobID string, scheduledAt tim
 		return nil, err
 	}
 	job.Status = domain.JobStatusReworkVisitProposed
-	job, err = uc.jobs.Update(job)
+	job, err = uc.updateJob(job)
 	if err != nil {
 		return nil, err
 	}
@@ -608,7 +614,7 @@ func (uc *JobUseCase) ConfirmReworkVisit(clerkID, jobID string) (*domain.Job, er
 		return nil, err
 	}
 	job.Status = domain.JobStatusWorkInProgress
-	job, err = uc.jobs.Update(job)
+	job, err = uc.updateJob(job)
 	if err != nil {
 		return nil, err
 	}
@@ -634,7 +640,7 @@ func (uc *JobUseCase) DeclineReworkVisit(clerkID, jobID string) (*domain.Job, er
 		return nil, err
 	}
 	job.Status = domain.JobStatusReworkAccepted
-	job, err = uc.jobs.Update(job)
+	job, err = uc.updateJob(job)
 	if err != nil {
 		return nil, err
 	}
@@ -671,7 +677,7 @@ func (uc *JobUseCase) ApproveDelivery(clerkID, jobID string) (*domain.Job, error
 	now := time.Now()
 	job.Status = domain.JobStatusCompleted
 	job.CompletedAt = &now
-	job, err = uc.jobs.Update(job)
+	job, err = uc.updateJob(job)
 	if err != nil {
 		return nil, err
 	}
@@ -711,7 +717,7 @@ func (uc *JobUseCase) Cancel(clerkID, jobID string, reason string) (*domain.Job,
 	job.Status = domain.JobStatusCancelled
 	job.CancelReason = reason
 	job.CancelledAt = &now
-	job, err = uc.jobs.Update(job)
+	job, err = uc.updateJob(job)
 	if err != nil {
 		return nil, err
 	}
@@ -745,6 +751,40 @@ func (uc *JobUseCase) notify(userID, notifType, message, entityID string) {
 	if uc.notifications != nil && userID != "" {
 		_ = uc.notifications.CreateForUser(userID, notifType, message, entityID)
 	}
+}
+
+// updateJob persists the job and, on success, publishes the new state to any
+// live subscribers of its detail page — the single choke point every
+// transition goes through, so every actionable propagates in real time for
+// free without each method having to remember to publish.
+func (uc *JobUseCase) updateJob(job *domain.Job) (*domain.Job, error) {
+	job, err := uc.jobs.Update(job)
+	if err != nil {
+		return nil, err
+	}
+	if uc.hub != nil {
+		uc.hub.Publish(job.ID, job)
+	}
+	return job, nil
+}
+
+func (uc *JobUseCase) Subscribe(clerkID, jobID string) (<-chan *domain.Job, func(), error) {
+	user, _, err := uc.resolveUser(clerkID)
+	if err != nil {
+		return nil, nil, err
+	}
+	job, err := uc.jobs.FindByID(jobID)
+	if err != nil {
+		return nil, nil, err
+	}
+	if !uc.canAccess(user, job) {
+		return nil, nil, errors.New("forbidden")
+	}
+	if uc.hub == nil {
+		return nil, nil, errors.New("realtime not configured")
+	}
+	ch, unsub := uc.hub.Subscribe(jobID)
+	return ch, unsub, nil
 }
 
 func validateTransition(from, to string) error {

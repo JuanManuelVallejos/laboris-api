@@ -31,6 +31,16 @@ func (h *JobHandler) GetJob(c *gin.Context) {
 	c.JSON(http.StatusOK, job)
 }
 
+func (h *JobHandler) StreamJob(c *gin.Context) {
+	ch, unsubscribe, err := h.uc.Subscribe(c.GetString("userId"), c.Param("id"))
+	if err != nil {
+		c.JSON(httpStatus(err), gin.H{"error": err.Error()})
+		return
+	}
+	defer unsubscribe()
+	streamSSE(c, ch, "job")
+}
+
 func (h *JobHandler) ListMyJobs(c *gin.Context) {
 	clerkID := c.GetString("userId")
 	jobs, err := h.uc.ListByUser(clerkID)

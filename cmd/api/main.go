@@ -53,6 +53,7 @@ func main() {
 
 		messageHub := realtime.NewHub[*domain.Message]()
 		notificationHub := realtime.NewHub[*domain.Notification]()
+		jobHub := realtime.NewHub[*domain.Job]()
 
 		notifUC := usecase.NewNotificationUseCase(notifRepo, userRepo)
 		notifUC.SetHub(notificationHub)
@@ -64,6 +65,7 @@ func main() {
 
 		jobUC := usecase.NewJobUseCase(jobRepo, payRepo, userRepo, profRepo, reworkRepo)
 		jobUC.SetNotifications(notifUC)
+		jobUC.SetHub(jobHub)
 		jobUC.SetAutoCloseDays(cfg.JobAutoCloseDays)
 
 		msgUC := usecase.NewMessageUseCase(msgRepo, reqRepo, userRepo, profRepo)
