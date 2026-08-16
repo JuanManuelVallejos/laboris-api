@@ -437,19 +437,19 @@ func (uc *JobUseCase) RequestRework(clerkID, jobID string, notes string) (*domai
 	job.Status = domain.JobStatusReworkRequested
 	job.ReworkCount++
 	job.ReworkNotes = notes
-	job, err = uc.updateJob(job)
-	if err != nil {
-		return nil, err
-	}
 	if uc.reworks != nil {
-		created, err := uc.reworks.Create(&domain.ReworkRecord{
+		created, cerr := uc.reworks.Create(&domain.ReworkRecord{
 			JobID:       job.ID,
 			CycleNumber: job.ReworkCount,
 			Notes:       notes,
 		})
-		if err == nil {
+		if cerr == nil {
 			job.ReworkRecords = append(job.ReworkRecords, *created)
 		}
+	}
+	job, err = uc.updateJob(job)
+	if err != nil {
+		return nil, err
 	}
 	msg := fmt.Sprintf("%s solicitó correcciones (retrabajo #%d)", job.ClientName, job.ReworkCount)
 	uc.notify(job.ProfessionalUID, "job_rework_requested", msg, job.ID)
@@ -479,10 +479,6 @@ func (uc *JobUseCase) SubmitReworkQuote(clerkID, jobID string, amount float64) (
 	}
 	job.Status = domain.JobStatusReworkQuoted
 	job.ReworkQuoteAmount = &amount
-	job, err = uc.updateJob(job)
-	if err != nil {
-		return nil, err
-	}
 	if uc.reworks != nil {
 		_ = uc.reworks.UpdateQuoteAmount(job.ID, job.ReworkCount, amount)
 	}
@@ -491,6 +487,10 @@ func (uc *JobUseCase) SubmitReworkQuote(clerkID, jobID string, amount float64) (
 			job.ReworkRecords[i].QuoteAmount = &amount
 			break
 		}
+	}
+	job, err = uc.updateJob(job)
+	if err != nil {
+		return nil, err
 	}
 	uc.notify(job.ClientID, "job_rework_quoted",
 		fmt.Sprintf("%s cotizó las correcciones en $%.2f. Aprobá para retomar el trabajo.", job.ProfessionalName, amount), job.ID)
@@ -541,10 +541,6 @@ func (uc *JobUseCase) AcceptRework(clerkID, jobID string) (*domain.Job, error) {
 	}
 	job.Status = domain.JobStatusReworkAccepted
 	job.ReworkQuoteAmount = nil // no extra cost — clear any amount from a previous cycle
-	job, err = uc.updateJob(job)
-	if err != nil {
-		return nil, err
-	}
 	if uc.reworks != nil {
 		_ = uc.reworks.MarkNoCharge(job.ID, job.ReworkCount)
 	}
@@ -553,6 +549,10 @@ func (uc *JobUseCase) AcceptRework(clerkID, jobID string) (*domain.Job, error) {
 			job.ReworkRecords[i].NoCharge = true
 			break
 		}
+	}
+	job, err = uc.updateJob(job)
+	if err != nil {
+		return nil, err
 	}
 	uc.notify(job.ClientID, "job_rework_accepted",
 		fmt.Sprintf("%s aceptó las correcciones sin costo extra. Va a proponer una fecha para retomar el trabajo.", job.ProfessionalName), job.ID)
@@ -579,10 +579,6 @@ func (uc *JobUseCase) ScheduleReworkVisit(clerkID, jobID string, scheduledAt tim
 		return nil, err
 	}
 	job.Status = domain.JobStatusReworkVisitProposed
-	job, err = uc.updateJob(job)
-	if err != nil {
-		return nil, err
-	}
 	if uc.reworks != nil {
 		_ = uc.reworks.UpdateScheduledAt(job.ID, job.ReworkCount, &scheduledAt)
 	}
@@ -591,6 +587,10 @@ func (uc *JobUseCase) ScheduleReworkVisit(clerkID, jobID string, scheduledAt tim
 			job.ReworkRecords[i].ScheduledAt = &scheduledAt
 			break
 		}
+	}
+	job, err = uc.updateJob(job)
+	if err != nil {
+		return nil, err
 	}
 	uc.notify(job.ClientID, "job_rework_visit_proposed",
 		fmt.Sprintf("%s propuso el %s para retomar el trabajo. Confirmalo desde la app.", job.ProfessionalName, scheduledAt.Format("02/01 15:04")), job.ID)
@@ -640,10 +640,6 @@ func (uc *JobUseCase) DeclineReworkVisit(clerkID, jobID string) (*domain.Job, er
 		return nil, err
 	}
 	job.Status = domain.JobStatusReworkAccepted
-	job, err = uc.updateJob(job)
-	if err != nil {
-		return nil, err
-	}
 	if uc.reworks != nil {
 		_ = uc.reworks.UpdateScheduledAt(job.ID, job.ReworkCount, nil)
 	}
@@ -652,6 +648,10 @@ func (uc *JobUseCase) DeclineReworkVisit(clerkID, jobID string) (*domain.Job, er
 			job.ReworkRecords[i].ScheduledAt = nil
 			break
 		}
+	}
+	job, err = uc.updateJob(job)
+	if err != nil {
+		return nil, err
 	}
 	uc.notify(job.ProfessionalUID, "job_rework_visit_declined",
 		fmt.Sprintf("%s rechazó la fecha propuesta para el retrabajo. Proponé una nueva.", job.ClientName), job.ID)
