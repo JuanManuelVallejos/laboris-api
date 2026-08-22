@@ -4,6 +4,7 @@ import "time"
 
 const (
 	AttachmentTypeProfessionalPortfolio = "professional_portfolio"
+	AttachmentTypeRequestPhoto          = "request_photo"
 )
 
 // Attachment is a generic, polymorphic reference to a file uploaded to

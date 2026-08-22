@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/laboris/laboris-api/internal/domain"
+	"github.com/laboris/laboris-api/internal/storage"
 )
 
 type RequestUseCase struct {
@@ -13,6 +14,7 @@ type RequestUseCase struct {
 	professionals domain.ProfessionalRepository
 	notifications *NotificationUseCase
 	jobs          domain.JobRepository
+	storage       *storage.SupabaseClient
 	autoCloseDays int
 }
 
@@ -26,6 +28,10 @@ func (uc *RequestUseCase) SetNotifications(n *NotificationUseCase) {
 
 func (uc *RequestUseCase) SetJobRepository(jobs domain.JobRepository) {
 	uc.jobs = jobs
+}
+
+func (uc *RequestUseCase) SetStorage(sc *storage.SupabaseClient) {
+	uc.storage = sc
 }
 
 func (uc *RequestUseCase) SetAutoCloseDays(days int) {
@@ -76,8 +82,44 @@ func (uc *RequestUseCase) ListReceivedByProfessional(clerkID string) ([]domain.R
 		return nil, errors.New("professional profile not found")
 	}
 	_, _ = AutoCloseOverdueJobs(uc.jobs, uc.notifications, uc.autoCloseDays)
-	_ = uc.requests.MarkAllPendingAsViewed(prof.ID)
 	return uc.requests.FindByProfessionalID(prof.ID)
+}
+
+// GetReceivedRequestDetail is how a professional opens a single request they
+// received. Seeing the full description + photos here is what marks the
+// request "viewed" (pending → viewed) — listing the inbox no longer does.
+func (uc *RequestUseCase) GetReceivedRequestDetail(clerkID, requestID string) (*domain.Request, error) {
+	user, err := uc.users.FindByClerkID(clerkID)
+	if err != nil {
+		return nil, err
+	}
+	if user == nil {
+		return nil, errors.New("user not found")
+	}
+	prof, err := uc.professionals.FindByUserID(user.ID)
+	if err != nil {
+		return nil, err
+	}
+	if prof == nil {
+		return nil, errors.New("professional profile not found")
+	}
+	rq, err := uc.requests.FindByID(requestID)
+	if err != nil {
+		return nil, err
+	}
+	if rq == nil {
+		return nil, errors.New("request not found")
+	}
+	if rq.ProfessionalID != prof.ID {
+		return nil, errors.New("forbidden")
+	}
+	if rq.Status == domain.RequestStatusPending {
+		if err := uc.requests.MarkViewed(rq.ID); err == nil {
+			rq.Status = domain.RequestStatusViewed
+		}
+	}
+	signAttachments(uc.storage, rq.Photos)
+	return rq, nil
 }
 
 func (uc *RequestUseCase) ListSentByClient(clerkID string) ([]domain.Request, error) {
@@ -92,13 +134,42 @@ func (uc *RequestUseCase) ListSentByClient(clerkID string) ([]domain.Request, er
 	return uc.requests.FindByClientID(user.ID)
 }
 
-func (uc *RequestUseCase) UpdateStatus(id, status, reason string) (*domain.Request, error) {
+func (uc *RequestUseCase) UpdateStatus(clerkID, id, status, reason string) (*domain.Request, error) {
 	if status != domain.RequestStatusAccepted && status != domain.RequestStatusRejected {
 		return nil, errors.New("invalid status")
 	}
 	if status == "rejected" && reason == "" {
 		return nil, errors.New("rejection reason is required")
 	}
+
+	user, err := uc.users.FindByClerkID(clerkID)
+	if err != nil {
+		return nil, err
+	}
+	if user == nil {
+		return nil, errors.New("user not found")
+	}
+	prof, err := uc.professionals.FindByUserID(user.ID)
+	if err != nil {
+		return nil, err
+	}
+	if prof == nil {
+		return nil, errors.New("forbidden: only a professional can accept or reject a request")
+	}
+	existing, err := uc.requests.FindByID(id)
+	if err != nil {
+		return nil, err
+	}
+	if existing == nil {
+		return nil, errors.New("request not found")
+	}
+	if existing.ProfessionalID != prof.ID {
+		return nil, errors.New("forbidden")
+	}
+	if existing.Status != domain.RequestStatusPending && existing.Status != domain.RequestStatusViewed {
+		return nil, errors.New("this request was already resolved")
+	}
+
 	rq, err := uc.requests.UpdateStatus(id, status, reason)
 	if err != nil {
 		return nil, err

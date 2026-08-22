@@ -43,6 +43,7 @@ func NewRouter(ph *ProfessionalHandler, oh *OnboardingHandler, mh *MeHandler, rh
 		priv.POST("/requests", rh.Create)
 		priv.GET("/me/requests/received", rh.ListReceived)
 		priv.GET("/me/requests/sent", rh.ListSent)
+		priv.GET("/requests/:id", rh.GetReceivedDetail)
 		priv.PATCH("/requests/:id", rh.UpdateStatus)
 
 		if nh != nil {
@@ -55,6 +56,7 @@ func NewRouter(ph *ProfessionalHandler, oh *OnboardingHandler, mh *MeHandler, rh
 		if atth != nil {
 			priv.POST("/me/professional/portfolio-photos", atth.UploadPortfolioPhoto)
 			priv.DELETE("/me/professional/portfolio-photos/:id", atth.DeletePortfolioPhoto)
+			priv.POST("/requests/:id/photos", atth.UploadRequestPhoto)
 		}
 
 		if jh != nil {

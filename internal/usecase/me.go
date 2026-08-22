@@ -29,7 +29,7 @@ func (uc *MeUseCase) GetMyProfessional(clerkID string) (*domain.Professional, er
 	if err != nil || prof == nil {
 		return prof, err
 	}
-	signPortfolioPhotos(uc.storage, prof)
+	signAttachments(uc.storage, prof.PortfolioPhotos)
 	return prof, nil
 }
 

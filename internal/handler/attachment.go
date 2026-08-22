@@ -43,3 +43,24 @@ func (h *AttachmentHandler) DeletePortfolioPhoto(c *gin.Context) {
 	}
 	c.Status(http.StatusNoContent)
 }
+
+func (h *AttachmentHandler) UploadRequestPhoto(c *gin.Context) {
+	fileHeader, err := c.FormFile("photo")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "missing photo file"})
+		return
+	}
+	file, err := fileHeader.Open()
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	defer file.Close()
+
+	attachment, err := h.uc.UploadRequestPhoto(c.GetString("userId"), c.Param("id"), file, fileHeader.Filename)
+	if err != nil {
+		c.JSON(httpStatus(err), gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusCreated, attachment)
+}

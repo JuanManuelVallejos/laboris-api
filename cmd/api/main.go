@@ -66,6 +66,7 @@ func main() {
 		reqUC := usecase.NewRequestUseCase(reqRepo, userRepo, profRepo)
 		reqUC.SetNotifications(notifUC)
 		reqUC.SetJobRepository(jobRepo)
+		reqUC.SetStorage(storageClient)
 		reqUC.SetAutoCloseDays(cfg.JobAutoCloseDays)
 
 		jobUC := usecase.NewJobUseCase(jobRepo, payRepo, userRepo, profRepo, reworkRepo)
@@ -77,7 +78,7 @@ func main() {
 		msgUC.SetNotifications(notifUC)
 		msgUC.SetHub(messageHub)
 
-		attachmentUC := usecase.NewAttachmentUseCase(attachmentRepo, userRepo, profRepo, storageClient)
+		attachmentUC := usecase.NewAttachmentUseCase(attachmentRepo, userRepo, profRepo, reqRepo, storageClient)
 
 		ph = handler.NewProfessionalHandler(usecase.NewProfessionalUseCase(profRepo, storageClient))
 		oh = handler.NewOnboardingHandler(usecase.NewOnboardingUseCase(userRepo, profRepo))

@@ -55,6 +55,16 @@ func (h *RequestHandler) ListSent(c *gin.Context) {
 	c.JSON(http.StatusOK, requests)
 }
 
+func (h *RequestHandler) GetReceivedDetail(c *gin.Context) {
+	clerkID := c.GetString("userId")
+	r, err := h.uc.GetReceivedRequestDetail(clerkID, c.Param("id"))
+	if err != nil {
+		c.JSON(httpStatus(err), gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, r)
+}
+
 type updateStatusBody struct {
 	Status string `json:"status"          binding:"required,oneof=accepted rejected"`
 	Reason string `json:"rejectionReason"`
@@ -67,9 +77,10 @@ func (h *RequestHandler) UpdateStatus(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	r, err := h.uc.UpdateStatus(id, req.Status, req.Reason)
+	clerkID := c.GetString("userId")
+	r, err := h.uc.UpdateStatus(clerkID, id, req.Status, req.Reason)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(httpStatus(err), gin.H{"error": err.Error()})
 		return
 	}
 	c.JSON(http.StatusOK, r)

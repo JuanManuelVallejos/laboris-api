@@ -36,11 +36,11 @@ func (r *RequestRepository) Create(req *domain.Request) (*domain.Request, error)
 	return req, nil
 }
 
-func (r *RequestRepository) MarkAllPendingAsViewed(professionalID string) error {
+func (r *RequestRepository) MarkViewed(id string) error {
 	_, err := r.db.Exec(context.Background(), `
 		UPDATE requests SET status = 'viewed'
-		WHERE professional_id = $1 AND status = 'pending'
-	`, professionalID)
+		WHERE id = $1 AND status = 'pending'
+	`, id)
 	return err
 }
 
@@ -60,7 +60,38 @@ func (r *RequestRepository) FindByID(id string) (*domain.Request, error) {
 	if err != nil {
 		return nil, err
 	}
+	photos, err := r.fetchRequestPhotos(rq.ID)
+	if err != nil {
+		return nil, err
+	}
+	rq.Photos = photos
 	return rq, nil
+}
+
+// fetchRequestPhotos loads a request's attached photos directly (same
+// pattern as ProfessionalRepository.fetchPortfolioPhotos) rather than
+// depending on AttachmentRepository, keeping repositories independent.
+func (r *RequestRepository) fetchRequestPhotos(requestID string) ([]domain.Attachment, error) {
+	rows, err := r.db.Query(context.Background(), `
+		SELECT id, type, owner_id, path, filename, extension, uploaded_by, created_at
+		FROM attachments
+		WHERE type = $1 AND owner_id = $2
+		ORDER BY created_at ASC
+	`, domain.AttachmentTypeRequestPhoto, requestID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	photos := make([]domain.Attachment, 0)
+	for rows.Next() {
+		var a domain.Attachment
+		if err := rows.Scan(&a.ID, &a.Type, &a.OwnerID, &a.Path, &a.Filename, &a.Extension, &a.UploadedBy, &a.CreatedAt); err != nil {
+			return nil, err
+		}
+		photos = append(photos, a)
+	}
+	return photos, nil
 }
 
 func (r *RequestRepository) FindByProfessionalID(professionalID string) ([]domain.Request, error) {

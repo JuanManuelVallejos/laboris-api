@@ -28,6 +28,6 @@ func (uc *professionalUseCase) GetByID(id string) (*domain.Professional, error) 
 	if err != nil || p == nil {
 		return p, err
 	}
-	signPortfolioPhotos(uc.storage, p)
+	signAttachments(uc.storage, p.PortfolioPhotos)
 	return p, nil
 }
