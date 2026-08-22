@@ -4,15 +4,17 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/laboris/laboris-api/internal/realtime"
 	"github.com/laboris/laboris-api/internal/usecase"
 )
 
 type NotificationHandler struct {
-	uc *usecase.NotificationUseCase
+	uc          *usecase.NotificationUseCase
+	connLimiter *realtime.ConnLimiter
 }
 
-func NewNotificationHandler(uc *usecase.NotificationUseCase) *NotificationHandler {
-	return &NotificationHandler{uc: uc}
+func NewNotificationHandler(uc *usecase.NotificationUseCase, connLimiter *realtime.ConnLimiter) *NotificationHandler {
+	return &NotificationHandler{uc: uc, connLimiter: connLimiter}
 }
 
 func (h *NotificationHandler) List(c *gin.Context) {
@@ -45,6 +47,13 @@ func (h *NotificationHandler) MarkAllRead(c *gin.Context) {
 }
 
 func (h *NotificationHandler) StreamNotifications(c *gin.Context) {
+	release, ok := h.connLimiter.Acquire(c.GetString("userId"))
+	if !ok {
+		c.JSON(http.StatusTooManyRequests, gin.H{"error": "too many open connections"})
+		return
+	}
+	defer release()
+
 	ch, unsubscribe, err := h.uc.Subscribe(c.GetString("userId"))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})

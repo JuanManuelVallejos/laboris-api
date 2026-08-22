@@ -5,16 +5,18 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/laboris/laboris-api/internal/realtime"
 	"github.com/laboris/laboris-api/internal/usecase"
 )
 
 type JobHandler struct {
-	uc  *usecase.JobUseCase
-	muc *usecase.MessageUseCase
+	uc          *usecase.JobUseCase
+	muc         *usecase.MessageUseCase
+	connLimiter *realtime.ConnLimiter
 }
 
-func NewJobHandler(uc *usecase.JobUseCase, muc *usecase.MessageUseCase) *JobHandler {
-	return &JobHandler{uc: uc, muc: muc}
+func NewJobHandler(uc *usecase.JobUseCase, muc *usecase.MessageUseCase, connLimiter *realtime.ConnLimiter) *JobHandler {
+	return &JobHandler{uc: uc, muc: muc, connLimiter: connLimiter}
 }
 
 func (h *JobHandler) GetJob(c *gin.Context) {
@@ -32,6 +34,13 @@ func (h *JobHandler) GetJob(c *gin.Context) {
 }
 
 func (h *JobHandler) StreamJob(c *gin.Context) {
+	release, ok := h.connLimiter.Acquire(c.GetString("userId"))
+	if !ok {
+		c.JSON(http.StatusTooManyRequests, gin.H{"error": "too many open connections"})
+		return
+	}
+	defer release()
+
 	ch, unsubscribe, err := h.uc.Subscribe(c.GetString("userId"), c.Param("id"))
 	if err != nil {
 		c.JSON(httpStatus(err), gin.H{"error": err.Error()})
@@ -233,6 +242,13 @@ func (h *JobHandler) SendMessage(c *gin.Context) {
 }
 
 func (h *JobHandler) StreamMessages(c *gin.Context) {
+	release, ok := h.connLimiter.Acquire(c.GetString("userId"))
+	if !ok {
+		c.JSON(http.StatusTooManyRequests, gin.H{"error": "too many open connections"})
+		return
+	}
+	defer release()
+
 	ch, unsubscribe, err := h.muc.Subscribe(c.GetString("userId"), c.Param("id"))
 	if err != nil {
 		c.JSON(httpStatus(err), gin.H{"error": err.Error()})

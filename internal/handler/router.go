@@ -18,6 +18,8 @@ func NewRouter(ph *ProfessionalHandler, oh *OnboardingHandler, mh *MeHandler, rh
 		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
 		AllowCredentials: true,
 	}))
+	r.Use(middleware.MaxBodySize(10 << 20)) // 10MB
+	r.Use(middleware.RateLimit(20, 40))     // 20 req/s por IP, ráfaga de 40
 
 	// Responde a todos los preflight OPTIONS
 	r.OPTIONS("/*path", func(c *gin.Context) {

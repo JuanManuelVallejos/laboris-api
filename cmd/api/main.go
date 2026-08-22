@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 	"log"
+	"net/http"
+	"time"
 
 	"github.com/clerk/clerk-sdk-go/v2"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -23,6 +25,7 @@ func main() {
 	clerk.SetKey(cfg.ClerkSecretKey)
 
 	storageClient := storage.NewSupabaseClient(cfg.SupabaseURL, cfg.SupabaseServiceRoleKey, cfg.SupabaseStorageBucket)
+	sseConnLimiter := realtime.NewConnLimiter(6) // tope de streams SSE concurrentes por usuario
 
 	var ph *handler.ProfessionalHandler
 	var oh *handler.OnboardingHandler
@@ -84,9 +87,9 @@ func main() {
 		oh = handler.NewOnboardingHandler(usecase.NewOnboardingUseCase(userRepo, profRepo))
 		mh = handler.NewMeHandler(usecase.NewMeUseCase(userRepo, profRepo, storageClient))
 		rh = handler.NewRequestHandler(reqUC)
-		nh = handler.NewNotificationHandler(notifUC)
+		nh = handler.NewNotificationHandler(notifUC, sseConnLimiter)
 		ah = handler.NewAdminHandler(usecase.NewAdminUseCase(userRepo, profRepo))
-		jh = handler.NewJobHandler(jobUC, msgUC)
+		jh = handler.NewJobHandler(jobUC, msgUC, sseConnLimiter)
 		atth = handler.NewAttachmentHandler(attachmentUC)
 
 		log.Println("using PostgreSQL")
@@ -102,8 +105,21 @@ func main() {
 
 	r := handler.NewRouter(ph, oh, mh, rh, nh, ah, jh, atth, pool)
 
+	// WriteTimeout deliberately left unset: it's the only timeout that would
+	// cut off long-lived SSE streams (job/message/notification updates),
+	// which need to stay open indefinitely by design. ReadHeaderTimeout and
+	// ReadTimeout guard against slow/malicious request writers (slowloris)
+	// without affecting how long the server may take to respond.
+	srv := &http.Server{
+		Addr:              ":" + cfg.Port,
+		Handler:           r,
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		IdleTimeout:       120 * time.Second,
+	}
+
 	log.Printf("starting laboris-api on :%s", cfg.Port)
-	if err := r.Run(":" + cfg.Port); err != nil {
+	if err := srv.ListenAndServe(); err != nil {
 		log.Fatalf("server error: %v", err)
 	}
 }
