@@ -8,10 +8,13 @@ import (
 )
 
 type Config struct {
-	Port             string
-	ClerkSecretKey   string
-	DatabaseURL      string
-	JobAutoCloseDays int
+	Port                   string
+	ClerkSecretKey         string
+	DatabaseURL            string
+	JobAutoCloseDays       int
+	SupabaseURL            string
+	SupabaseServiceRoleKey string
+	SupabaseStorageBucket  string
 }
 
 func Load() *Config {
@@ -29,10 +32,18 @@ func Load() *Config {
 		}
 	}
 
+	storageBucket := os.Getenv("SUPABASE_STORAGE_BUCKET")
+	if storageBucket == "" {
+		storageBucket = "attachments"
+	}
+
 	return &Config{
-		Port:             port,
-		ClerkSecretKey:   os.Getenv("CLERK_SECRET_KEY"),
-		DatabaseURL:      os.Getenv("DATABASE_URL"),
-		JobAutoCloseDays: autoCloseDays,
+		Port:                   port,
+		ClerkSecretKey:         os.Getenv("CLERK_SECRET_KEY"),
+		DatabaseURL:            os.Getenv("DATABASE_URL"),
+		JobAutoCloseDays:       autoCloseDays,
+		SupabaseURL:            os.Getenv("SUPABASE_URL"),
+		SupabaseServiceRoleKey: os.Getenv("SUPABASE_SERVICE_ROLE_KEY"),
+		SupabaseStorageBucket:  storageBucket,
 	}
 }

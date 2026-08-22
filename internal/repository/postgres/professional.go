@@ -58,7 +58,15 @@ func (r *ProfessionalRepository) FindByID(id string) (*domain.Professional, erro
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}
-	return p, err
+	if err != nil {
+		return nil, err
+	}
+	photos, err := r.fetchPortfolioPhotos(p.ID)
+	if err != nil {
+		return nil, err
+	}
+	p.PortfolioPhotos = photos
+	return p, nil
 }
 
 func (r *ProfessionalRepository) FindByUserID(userID string) (*domain.Professional, error) {
@@ -75,7 +83,41 @@ func (r *ProfessionalRepository) FindByUserID(userID string) (*domain.Profession
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}
-	return p, err
+	if err != nil {
+		return nil, err
+	}
+	photos, err := r.fetchPortfolioPhotos(p.ID)
+	if err != nil {
+		return nil, err
+	}
+	p.PortfolioPhotos = photos
+	return p, nil
+}
+
+// fetchPortfolioPhotos loads a professional's portfolio attachments directly
+// (same pattern as JobRepository.fetchReworkRecords) rather than depending
+// on AttachmentRepository, keeping repositories independent of each other.
+func (r *ProfessionalRepository) fetchPortfolioPhotos(professionalID string) ([]domain.Attachment, error) {
+	rows, err := r.db.Query(context.Background(), `
+		SELECT id, type, owner_id, path, filename, extension, uploaded_by, created_at
+		FROM attachments
+		WHERE type = $1 AND owner_id = $2
+		ORDER BY created_at ASC
+	`, domain.AttachmentTypeProfessionalPortfolio, professionalID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	photos := make([]domain.Attachment, 0)
+	for rows.Next() {
+		var a domain.Attachment
+		if err := rows.Scan(&a.ID, &a.Type, &a.OwnerID, &a.Path, &a.Filename, &a.Extension, &a.UploadedBy, &a.CreatedAt); err != nil {
+			return nil, err
+		}
+		photos = append(photos, a)
+	}
+	return photos, nil
 }
 
 func (r *ProfessionalRepository) UpdateByUserID(userID, trade, zone, bio string) (*domain.Professional, error) {

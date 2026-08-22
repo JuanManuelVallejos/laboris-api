@@ -13,6 +13,7 @@ import (
 	"github.com/laboris/laboris-api/internal/realtime"
 	repomemory "github.com/laboris/laboris-api/internal/repository/memory"
 	repopostgres "github.com/laboris/laboris-api/internal/repository/postgres"
+	"github.com/laboris/laboris-api/internal/storage"
 	"github.com/laboris/laboris-api/internal/usecase"
 )
 
@@ -21,6 +22,8 @@ func main() {
 
 	clerk.SetKey(cfg.ClerkSecretKey)
 
+	storageClient := storage.NewSupabaseClient(cfg.SupabaseURL, cfg.SupabaseServiceRoleKey, cfg.SupabaseStorageBucket)
+
 	var ph *handler.ProfessionalHandler
 	var oh *handler.OnboardingHandler
 	var mh *handler.MeHandler
@@ -28,6 +31,7 @@ func main() {
 	var nh *handler.NotificationHandler
 	var ah *handler.AdminHandler
 	var jh *handler.JobHandler
+	var atth *handler.AttachmentHandler
 	var pool *pgxpool.Pool
 
 	if cfg.DatabaseURL != "" {
@@ -50,6 +54,7 @@ func main() {
 		msgRepo := repopostgres.NewMessageRepository(pool)
 		payRepo := repopostgres.NewPaymentRepository(pool)
 		reworkRepo := repopostgres.NewReworkRecordRepository(pool)
+		attachmentRepo := repopostgres.NewAttachmentRepository(pool)
 
 		messageHub := realtime.NewHub[*domain.Message]()
 		notificationHub := realtime.NewHub[*domain.Notification]()
@@ -72,26 +77,29 @@ func main() {
 		msgUC.SetNotifications(notifUC)
 		msgUC.SetHub(messageHub)
 
-		ph = handler.NewProfessionalHandler(usecase.NewProfessionalUseCase(profRepo))
+		attachmentUC := usecase.NewAttachmentUseCase(attachmentRepo, userRepo, profRepo, storageClient)
+
+		ph = handler.NewProfessionalHandler(usecase.NewProfessionalUseCase(profRepo, storageClient))
 		oh = handler.NewOnboardingHandler(usecase.NewOnboardingUseCase(userRepo, profRepo))
-		mh = handler.NewMeHandler(usecase.NewMeUseCase(userRepo, profRepo))
+		mh = handler.NewMeHandler(usecase.NewMeUseCase(userRepo, profRepo, storageClient))
 		rh = handler.NewRequestHandler(reqUC)
 		nh = handler.NewNotificationHandler(notifUC)
 		ah = handler.NewAdminHandler(usecase.NewAdminUseCase(userRepo, profRepo))
 		jh = handler.NewJobHandler(jobUC, msgUC)
+		atth = handler.NewAttachmentHandler(attachmentUC)
 
 		log.Println("using PostgreSQL")
 	} else {
 		profRepo := repomemory.NewProfessionalRepository()
-		ph = handler.NewProfessionalHandler(usecase.NewProfessionalUseCase(profRepo))
+		ph = handler.NewProfessionalHandler(usecase.NewProfessionalUseCase(profRepo, storageClient))
 		oh = handler.NewOnboardingHandler(usecase.NewOnboardingUseCase(nil, nil))
-		mh = handler.NewMeHandler(usecase.NewMeUseCase(nil, profRepo))
+		mh = handler.NewMeHandler(usecase.NewMeUseCase(nil, profRepo, storageClient))
 		rh = handler.NewRequestHandler(usecase.NewRequestUseCase(nil, nil, profRepo))
 
 		log.Println("using in-memory repository (no DATABASE_URL set)")
 	}
 
-	r := handler.NewRouter(ph, oh, mh, rh, nh, ah, jh, pool)
+	r := handler.NewRouter(ph, oh, mh, rh, nh, ah, jh, atth, pool)
 
 	log.Printf("starting laboris-api on :%s", cfg.Port)
 	if err := r.Run(":" + cfg.Port); err != nil {

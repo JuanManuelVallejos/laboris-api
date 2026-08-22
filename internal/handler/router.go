@@ -9,7 +9,7 @@ import (
 	"github.com/laboris/laboris-api/internal/middleware"
 )
 
-func NewRouter(ph *ProfessionalHandler, oh *OnboardingHandler, mh *MeHandler, rh *RequestHandler, nh *NotificationHandler, ah *AdminHandler, jh *JobHandler, db *pgxpool.Pool) *gin.Engine {
+func NewRouter(ph *ProfessionalHandler, oh *OnboardingHandler, mh *MeHandler, rh *RequestHandler, nh *NotificationHandler, ah *AdminHandler, jh *JobHandler, atth *AttachmentHandler, db *pgxpool.Pool) *gin.Engine {
 	r := gin.Default()
 
 	r.Use(cors.New(cors.Config{
@@ -50,6 +50,11 @@ func NewRouter(ph *ProfessionalHandler, oh *OnboardingHandler, mh *MeHandler, rh
 			priv.GET("/me/notifications/unread-count", nh.UnreadCount)
 			priv.POST("/me/notifications/read-all", nh.MarkAllRead)
 			priv.GET("/me/notifications/stream", nh.StreamNotifications)
+		}
+
+		if atth != nil {
+			priv.POST("/me/professional/portfolio-photos", atth.UploadPortfolioPhoto)
+			priv.DELETE("/me/professional/portfolio-photos/:id", atth.DeletePortfolioPhoto)
 		}
 
 		if jh != nil {

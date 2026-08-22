@@ -4,15 +4,17 @@ import (
 	"errors"
 
 	"github.com/laboris/laboris-api/internal/domain"
+	"github.com/laboris/laboris-api/internal/storage"
 )
 
 type MeUseCase struct {
 	users         domain.UserRepository
 	professionals domain.ProfessionalRepository
+	storage       *storage.SupabaseClient
 }
 
-func NewMeUseCase(users domain.UserRepository, professionals domain.ProfessionalRepository) *MeUseCase {
-	return &MeUseCase{users: users, professionals: professionals}
+func NewMeUseCase(users domain.UserRepository, professionals domain.ProfessionalRepository, storageClient *storage.SupabaseClient) *MeUseCase {
+	return &MeUseCase{users: users, professionals: professionals, storage: storageClient}
 }
 
 func (uc *MeUseCase) GetMyProfessional(clerkID string) (*domain.Professional, error) {
@@ -23,7 +25,12 @@ func (uc *MeUseCase) GetMyProfessional(clerkID string) (*domain.Professional, er
 	if user == nil {
 		return nil, errors.New("user not found")
 	}
-	return uc.professionals.FindByUserID(user.ID)
+	prof, err := uc.professionals.FindByUserID(user.ID)
+	if err != nil || prof == nil {
+		return prof, err
+	}
+	signPortfolioPhotos(uc.storage, prof)
+	return prof, nil
 }
 
 func (uc *MeUseCase) UpdateMyProfessional(clerkID, trade, zone, bio string) (*domain.Professional, error) {

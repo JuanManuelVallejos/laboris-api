@@ -1,6 +1,9 @@
 package usecase
 
-import "github.com/laboris/laboris-api/internal/domain"
+import (
+	"github.com/laboris/laboris-api/internal/domain"
+	"github.com/laboris/laboris-api/internal/storage"
+)
 
 type ProfessionalUseCase interface {
 	GetAll() ([]domain.Professional, error)
@@ -8,11 +11,12 @@ type ProfessionalUseCase interface {
 }
 
 type professionalUseCase struct {
-	repo domain.ProfessionalRepository
+	repo    domain.ProfessionalRepository
+	storage *storage.SupabaseClient
 }
 
-func NewProfessionalUseCase(repo domain.ProfessionalRepository) ProfessionalUseCase {
-	return &professionalUseCase{repo: repo}
+func NewProfessionalUseCase(repo domain.ProfessionalRepository, storageClient *storage.SupabaseClient) ProfessionalUseCase {
+	return &professionalUseCase{repo: repo, storage: storageClient}
 }
 
 func (uc *professionalUseCase) GetAll() ([]domain.Professional, error) {
@@ -20,5 +24,10 @@ func (uc *professionalUseCase) GetAll() ([]domain.Professional, error) {
 }
 
 func (uc *professionalUseCase) GetByID(id string) (*domain.Professional, error) {
-	return uc.repo.FindByID(id)
+	p, err := uc.repo.FindByID(id)
+	if err != nil || p == nil {
+		return p, err
+	}
+	signPortfolioPhotos(uc.storage, p)
+	return p, nil
 }
