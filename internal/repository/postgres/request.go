@@ -48,15 +48,17 @@ func (r *RequestRepository) FindByID(id string) (*domain.Request, error) {
 	rq := &domain.Request{}
 	err := r.db.QueryRow(context.Background(), `
 		SELECT rq.id, rq.client_id, uc.full_name, rq.professional_id, up.full_name,
-		       rq.description, rq.status, COALESCE(rq.rejection_reason,''), COALESCE(j.id::text,''), rq.created_at
+		       rq.description, rq.status, COALESCE(rq.rejection_reason,''), COALESCE(j.id::text,''),
+		       COALESCE(ad.address,''), rq.created_at
 		FROM requests rq
 		JOIN users uc ON uc.id = rq.client_id
 		JOIN professionals p ON p.id = rq.professional_id
 		JOIN users up ON up.id = p.user_id
 		LEFT JOIN jobs j ON j.request_id = rq.id
+		LEFT JOIN addresses ad ON ad.id = rq.address_id
 		WHERE rq.id = $1
 	`, id).Scan(&rq.ID, &rq.ClientID, &rq.ClientName, &rq.ProfessionalID, &rq.ProfessionalName,
-		&rq.Description, &rq.Status, &rq.RejectionReason, &rq.JobID, &rq.CreatedAt)
+		&rq.Description, &rq.Status, &rq.RejectionReason, &rq.JobID, &rq.Address, &rq.CreatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -97,12 +99,14 @@ func (r *RequestRepository) fetchRequestPhotos(requestID string) ([]domain.Attac
 func (r *RequestRepository) FindByProfessionalID(professionalID string) ([]domain.Request, error) {
 	rows, err := r.db.Query(context.Background(), `
 		SELECT rq.id, rq.client_id, uc.full_name, rq.professional_id, up.full_name,
-		       rq.description, rq.status, COALESCE(rq.rejection_reason,''), COALESCE(j.id::text,''), rq.created_at
+		       rq.description, rq.status, COALESCE(rq.rejection_reason,''), COALESCE(j.id::text,''),
+		       COALESCE(ad.address,''), rq.created_at
 		FROM requests rq
 		JOIN users uc ON uc.id = rq.client_id
 		JOIN professionals p ON p.id = rq.professional_id
 		JOIN users up ON up.id = p.user_id
 		LEFT JOIN jobs j ON j.request_id = rq.id
+		LEFT JOIN addresses ad ON ad.id = rq.address_id
 		WHERE rq.professional_id = $1
 		ORDER BY rq.created_at DESC
 	`, professionalID)
@@ -115,7 +119,7 @@ func (r *RequestRepository) FindByProfessionalID(professionalID string) ([]domai
 	for rows.Next() {
 		var rq domain.Request
 		if err := rows.Scan(&rq.ID, &rq.ClientID, &rq.ClientName, &rq.ProfessionalID, &rq.ProfessionalName,
-			&rq.Description, &rq.Status, &rq.RejectionReason, &rq.JobID, &rq.CreatedAt); err != nil {
+			&rq.Description, &rq.Status, &rq.RejectionReason, &rq.JobID, &rq.Address, &rq.CreatedAt); err != nil {
 			return nil, err
 		}
 		result = append(result, rq)
@@ -126,12 +130,14 @@ func (r *RequestRepository) FindByProfessionalID(professionalID string) ([]domai
 func (r *RequestRepository) FindByClientID(clientID string) ([]domain.Request, error) {
 	rows, err := r.db.Query(context.Background(), `
 		SELECT rq.id, rq.client_id, uc.full_name, rq.professional_id, up.full_name,
-		       rq.description, rq.status, COALESCE(rq.rejection_reason,''), COALESCE(j.id::text,''), rq.created_at
+		       rq.description, rq.status, COALESCE(rq.rejection_reason,''), COALESCE(j.id::text,''),
+		       COALESCE(ad.address,''), rq.created_at
 		FROM requests rq
 		JOIN users uc ON uc.id = rq.client_id
 		JOIN professionals p ON p.id = rq.professional_id
 		JOIN users up ON up.id = p.user_id
 		LEFT JOIN jobs j ON j.request_id = rq.id
+		LEFT JOIN addresses ad ON ad.id = rq.address_id
 		WHERE rq.client_id = $1
 		ORDER BY rq.created_at DESC
 	`, clientID)
@@ -144,7 +150,7 @@ func (r *RequestRepository) FindByClientID(clientID string) ([]domain.Request, e
 	for rows.Next() {
 		var rq domain.Request
 		if err := rows.Scan(&rq.ID, &rq.ClientID, &rq.ClientName, &rq.ProfessionalID, &rq.ProfessionalName,
-			&rq.Description, &rq.Status, &rq.RejectionReason, &rq.JobID, &rq.CreatedAt); err != nil {
+			&rq.Description, &rq.Status, &rq.RejectionReason, &rq.JobID, &rq.Address, &rq.CreatedAt); err != nil {
 			return nil, err
 		}
 		result = append(result, rq)

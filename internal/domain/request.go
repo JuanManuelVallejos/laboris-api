@@ -18,7 +18,11 @@ type Request struct {
 	ProfessionalName string `json:"professionalName"`
 	// AddressID es el domicilio guardado elegido al pedir el presupuesto —
 	// nil en solicitudes viejas, creadas antes de este sistema (legacy).
-	AddressID       *string      `json:"-"`
+	AddressID *string `json:"-"`
+	// Address es el texto del domicilio (join contra addresses) — se lo
+	// mostramos al profesional para que pueda evaluar la zona antes de
+	// aceptar. Vacío en solicitudes legacy sin address_id.
+	Address         string       `json:"address,omitempty"`
 	Description     string       `json:"description"`
 	Status          string       `json:"status"`
 	RejectionReason string       `json:"rejectionReason"`
