@@ -38,6 +38,8 @@ func (uc *RequestUseCase) SetAutoCloseDays(days int) {
 	uc.autoCloseDays = days
 }
 
+var ErrSelfRequest = errors.New("no podés solicitar presupuesto a vos mismo")
+
 func (uc *RequestUseCase) Create(clerkID, professionalID, description string) (*domain.Request, error) {
 	user, err := uc.users.FindByClerkID(clerkID)
 	if err != nil {
@@ -46,6 +48,17 @@ func (uc *RequestUseCase) Create(clerkID, professionalID, description string) (*
 	if user == nil {
 		return nil, errors.New("user not found")
 	}
+
+	if uc.professionals != nil {
+		prof, err := uc.professionals.FindByID(professionalID)
+		if err != nil {
+			return nil, err
+		}
+		if prof != nil && prof.UserID == user.ID {
+			return nil, ErrSelfRequest
+		}
+	}
+
 	req, err := uc.requests.Create(&domain.Request{
 		ClientID:       user.ID,
 		ProfessionalID: professionalID,

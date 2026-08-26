@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -29,7 +30,11 @@ func (h *RequestHandler) Create(c *gin.Context) {
 	clerkID := c.GetString("userId")
 	r, err := h.uc.Create(clerkID, req.ProfessionalID, req.Description)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		status := http.StatusInternalServerError
+		if errors.Is(err, usecase.ErrSelfRequest) {
+			status = http.StatusBadRequest
+		}
+		c.JSON(status, gin.H{"error": err.Error()})
 		return
 	}
 	c.JSON(http.StatusCreated, r)
