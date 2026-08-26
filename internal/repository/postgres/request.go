@@ -20,11 +20,11 @@ func NewRequestRepository(db *pgxpool.Pool) *RequestRepository {
 
 func (r *RequestRepository) Create(req *domain.Request) (*domain.Request, error) {
 	err := r.db.QueryRow(context.Background(), `
-		INSERT INTO requests (client_id, professional_id, description, address_id)
-		VALUES ($1, $2, $3, $4)
-		RETURNING id, client_id, professional_id, description, status, COALESCE(rejection_reason,''), address_id, created_at
-	`, req.ClientID, req.ProfessionalID, req.Description, req.AddressID,
-	).Scan(&req.ID, &req.ClientID, &req.ProfessionalID, &req.Description, &req.Status, &req.RejectionReason, &req.AddressID, &req.CreatedAt)
+		INSERT INTO requests (client_id, professional_id, description, address_id, address_snapshot)
+		VALUES ($1, $2, $3, $4, NULLIF($5, ''))
+		RETURNING id, client_id, professional_id, description, status, COALESCE(rejection_reason,''), address_id, COALESCE(address_snapshot,''), created_at
+	`, req.ClientID, req.ProfessionalID, req.Description, req.AddressID, req.Address,
+	).Scan(&req.ID, &req.ClientID, &req.ProfessionalID, &req.Description, &req.Status, &req.RejectionReason, &req.AddressID, &req.Address, &req.CreatedAt)
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == "23505" &&
@@ -49,13 +49,12 @@ func (r *RequestRepository) FindByID(id string) (*domain.Request, error) {
 	err := r.db.QueryRow(context.Background(), `
 		SELECT rq.id, rq.client_id, uc.full_name, rq.professional_id, up.full_name,
 		       rq.description, rq.status, COALESCE(rq.rejection_reason,''), COALESCE(j.id::text,''),
-		       COALESCE(ad.address,''), rq.created_at
+		       COALESCE(rq.address_snapshot,''), rq.created_at
 		FROM requests rq
 		JOIN users uc ON uc.id = rq.client_id
 		JOIN professionals p ON p.id = rq.professional_id
 		JOIN users up ON up.id = p.user_id
 		LEFT JOIN jobs j ON j.request_id = rq.id
-		LEFT JOIN addresses ad ON ad.id = rq.address_id
 		WHERE rq.id = $1
 	`, id).Scan(&rq.ID, &rq.ClientID, &rq.ClientName, &rq.ProfessionalID, &rq.ProfessionalName,
 		&rq.Description, &rq.Status, &rq.RejectionReason, &rq.JobID, &rq.Address, &rq.CreatedAt)
@@ -100,13 +99,12 @@ func (r *RequestRepository) FindByProfessionalID(professionalID string) ([]domai
 	rows, err := r.db.Query(context.Background(), `
 		SELECT rq.id, rq.client_id, uc.full_name, rq.professional_id, up.full_name,
 		       rq.description, rq.status, COALESCE(rq.rejection_reason,''), COALESCE(j.id::text,''),
-		       COALESCE(ad.address,''), rq.created_at
+		       COALESCE(rq.address_snapshot,''), rq.created_at
 		FROM requests rq
 		JOIN users uc ON uc.id = rq.client_id
 		JOIN professionals p ON p.id = rq.professional_id
 		JOIN users up ON up.id = p.user_id
 		LEFT JOIN jobs j ON j.request_id = rq.id
-		LEFT JOIN addresses ad ON ad.id = rq.address_id
 		WHERE rq.professional_id = $1
 		ORDER BY rq.created_at DESC
 	`, professionalID)
@@ -131,13 +129,12 @@ func (r *RequestRepository) FindByClientID(clientID string) ([]domain.Request, e
 	rows, err := r.db.Query(context.Background(), `
 		SELECT rq.id, rq.client_id, uc.full_name, rq.professional_id, up.full_name,
 		       rq.description, rq.status, COALESCE(rq.rejection_reason,''), COALESCE(j.id::text,''),
-		       COALESCE(ad.address,''), rq.created_at
+		       COALESCE(rq.address_snapshot,''), rq.created_at
 		FROM requests rq
 		JOIN users uc ON uc.id = rq.client_id
 		JOIN professionals p ON p.id = rq.professional_id
 		JOIN users up ON up.id = p.user_id
 		LEFT JOIN jobs j ON j.request_id = rq.id
-		LEFT JOIN addresses ad ON ad.id = rq.address_id
 		WHERE rq.client_id = $1
 		ORDER BY rq.created_at DESC
 	`, clientID)

@@ -42,13 +42,17 @@ var ValidTransitions = map[string]map[string]bool{
 }
 
 type Job struct {
-	ID                string     `json:"id"`
-	RequestID         string     `json:"requestId"`
-	ClientID          string     `json:"clientId"`
-	ClientName        string     `json:"clientName"`
-	ProfessionalID    string     `json:"professionalId"`
-	ProfessionalName  string     `json:"professionalName"`
-	ProfessionalUID   string     `json:"-"` // professional's user_id — used for auth, not exposed
+	ID               string `json:"id"`
+	RequestID        string `json:"requestId"`
+	ClientID         string `json:"clientId"`
+	ClientName       string `json:"clientName"`
+	ProfessionalID   string `json:"professionalId"`
+	ProfessionalName string `json:"professionalName"`
+	ProfessionalUID  string `json:"-"` // professional's user_id — used for auth, not exposed
+	// Address es el domicilio congelado al momento de crear la solicitud
+	// (requests.address_snapshot) — no cambia aunque el cliente después
+	// edite o borre ese domicilio guardado. Vacío en trabajos legacy.
+	Address           string     `json:"address,omitempty"`
 	Status            string     `json:"status"`
 	VisitScheduledAt  *time.Time `json:"visitScheduledAt,omitempty"`
 	VisitQuoteAmount  *float64   `json:"visitQuoteAmount,omitempty"`

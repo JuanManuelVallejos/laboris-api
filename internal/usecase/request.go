@@ -58,6 +58,7 @@ func (uc *RequestUseCase) Create(clerkID, professionalID, description, addressID
 	}
 
 	var addrID *string
+	var addrSnapshot string
 	if uc.addresses != nil {
 		addr, err := uc.addresses.FindByID(addressID)
 		if err != nil {
@@ -67,6 +68,10 @@ func (uc *RequestUseCase) Create(clerkID, professionalID, description, addressID
 			return nil, ErrAddressNotFound
 		}
 		addrID = &addr.ID
+		// Se congela el texto tal cual está ahora — si el cliente después
+		// edita o borra este domicilio, esta solicitud (y el trabajo que
+		// salga de ella) no cambian.
+		addrSnapshot = addr.Address
 	}
 
 	if uc.professionals != nil {
@@ -84,6 +89,7 @@ func (uc *RequestUseCase) Create(clerkID, professionalID, description, addressID
 		ProfessionalID: professionalID,
 		Description:    description,
 		AddressID:      addrID,
+		Address:        addrSnapshot,
 	})
 	if err != nil {
 		return nil, err

@@ -20,6 +20,7 @@ const jobSelectCols = `
 	j.id, j.request_id,
 	j.client_id,      uc.full_name,
 	j.professional_id, up.full_name, p.user_id,
+	COALESCE(rq.address_snapshot,''),
 	j.status,
 	j.visit_scheduled_at, j.visit_quote_amount, j.work_quote_amount,
 	j.work_description,   j.rework_count,       j.rework_notes,
@@ -32,7 +33,8 @@ const jobJoins = `
 	FROM jobs j
 	JOIN users uc ON uc.id = j.client_id
 	JOIN professionals p ON p.id = j.professional_id
-	JOIN users up ON up.id = p.user_id`
+	JOIN users up ON up.id = p.user_id
+	LEFT JOIN requests rq ON rq.id = j.request_id`
 
 func scanJob(row interface{ Scan(...any) error }) (*domain.Job, error) {
 	j := &domain.Job{}
@@ -52,6 +54,7 @@ func scanJob(row interface{ Scan(...any) error }) (*domain.Job, error) {
 		&j.ID, &j.RequestID,
 		&j.ClientID, &j.ClientName,
 		&j.ProfessionalID, &j.ProfessionalName, &j.ProfessionalUID,
+		&j.Address,
 		&j.Status,
 		&visitScheduledAt, &visitQuoteAmount, &workQuoteAmount,
 		&workDescription, &j.ReworkCount, &reworkNotes,
