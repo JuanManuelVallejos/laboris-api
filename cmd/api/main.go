@@ -38,6 +38,7 @@ func main() {
 	var jh *handler.JobHandler
 	var atth *handler.AttachmentHandler
 	var wh *handler.ClerkWebhookHandler
+	var adh *handler.AddressHandler
 	var pool *pgxpool.Pool
 
 	if cfg.DatabaseURL != "" {
@@ -61,6 +62,7 @@ func main() {
 		payRepo := repopostgres.NewPaymentRepository(pool)
 		reworkRepo := repopostgres.NewReworkRecordRepository(pool)
 		attachmentRepo := repopostgres.NewAttachmentRepository(pool)
+		addressRepo := repopostgres.NewAddressRepository(pool)
 
 		messageHub := realtime.NewHub[*domain.Message]()
 		notificationHub := realtime.NewHub[*domain.Notification]()
@@ -74,6 +76,7 @@ func main() {
 		reqUC.SetJobRepository(jobRepo)
 		reqUC.SetStorage(storageClient)
 		reqUC.SetAutoCloseDays(cfg.JobAutoCloseDays)
+		reqUC.SetAddressRepository(addressRepo)
 
 		jobUC := usecase.NewJobUseCase(jobRepo, payRepo, userRepo, profRepo, reworkRepo)
 		jobUC.SetNotifications(notifUC)
@@ -94,6 +97,7 @@ func main() {
 		ah = handler.NewAdminHandler(usecase.NewAdminUseCase(userRepo, profRepo))
 		jh = handler.NewJobHandler(jobUC, msgUC, sseConnLimiter)
 		atth = handler.NewAttachmentHandler(attachmentUC)
+		adh = handler.NewAddressHandler(usecase.NewAddressUseCase(addressRepo, userRepo, geoClient))
 		if cfg.ClerkWebhookSecret != "" {
 			wh = handler.NewClerkWebhookHandler(usecase.NewUserSyncUseCase(userRepo), cfg.ClerkWebhookSecret)
 		}
@@ -109,7 +113,7 @@ func main() {
 		log.Println("using in-memory repository (no DATABASE_URL set)")
 	}
 
-	r := handler.NewRouter(ph, oh, mh, rh, nh, ah, jh, atth, wh, pool)
+	r := handler.NewRouter(ph, oh, mh, rh, nh, ah, jh, atth, wh, adh, pool)
 
 	// WriteTimeout deliberately left unset: it's the only timeout that would
 	// cut off long-lived SSE streams (job/message/notification updates),

@@ -12,6 +12,7 @@ type RequestUseCase struct {
 	requests      domain.RequestRepository
 	users         domain.UserRepository
 	professionals domain.ProfessionalRepository
+	addresses     domain.AddressRepository
 	notifications *NotificationUseCase
 	jobs          domain.JobRepository
 	storage       *storage.SupabaseClient
@@ -24,6 +25,10 @@ func NewRequestUseCase(requests domain.RequestRepository, users domain.UserRepos
 
 func (uc *RequestUseCase) SetNotifications(n *NotificationUseCase) {
 	uc.notifications = n
+}
+
+func (uc *RequestUseCase) SetAddressRepository(addresses domain.AddressRepository) {
+	uc.addresses = addresses
 }
 
 func (uc *RequestUseCase) SetJobRepository(jobs domain.JobRepository) {
@@ -40,7 +45,7 @@ func (uc *RequestUseCase) SetAutoCloseDays(days int) {
 
 var ErrSelfRequest = errors.New("no podés solicitar presupuesto a vos mismo")
 
-func (uc *RequestUseCase) Create(clerkID, professionalID, description string) (*domain.Request, error) {
+func (uc *RequestUseCase) Create(clerkID, professionalID, description, addressID string) (*domain.Request, error) {
 	user, err := uc.users.FindByClerkID(clerkID)
 	if err != nil {
 		return nil, err
@@ -50,6 +55,18 @@ func (uc *RequestUseCase) Create(clerkID, professionalID, description string) (*
 	}
 	if !user.HasHomeAddress() {
 		return nil, ErrAddressRequired
+	}
+
+	var addrID *string
+	if uc.addresses != nil {
+		addr, err := uc.addresses.FindByID(addressID)
+		if err != nil {
+			return nil, err
+		}
+		if addr == nil || addr.UserID != user.ID {
+			return nil, ErrAddressNotFound
+		}
+		addrID = &addr.ID
 	}
 
 	if uc.professionals != nil {
@@ -66,6 +83,7 @@ func (uc *RequestUseCase) Create(clerkID, professionalID, description string) (*
 		ClientID:       user.ID,
 		ProfessionalID: professionalID,
 		Description:    description,
+		AddressID:      addrID,
 	})
 	if err != nil {
 		return nil, err

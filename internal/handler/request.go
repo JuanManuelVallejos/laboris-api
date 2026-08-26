@@ -19,6 +19,7 @@ func NewRequestHandler(uc *usecase.RequestUseCase) *RequestHandler {
 type createRequestBody struct {
 	ProfessionalID string `json:"professionalId" binding:"required"`
 	Description    string `json:"description"    binding:"required"`
+	AddressID      string `json:"addressId"      binding:"required"`
 }
 
 func (h *RequestHandler) Create(c *gin.Context) {
@@ -28,10 +29,10 @@ func (h *RequestHandler) Create(c *gin.Context) {
 		return
 	}
 	clerkID := c.GetString("userId")
-	r, err := h.uc.Create(clerkID, req.ProfessionalID, req.Description)
+	r, err := h.uc.Create(clerkID, req.ProfessionalID, req.Description, req.AddressID)
 	if err != nil {
 		status := http.StatusInternalServerError
-		if errors.Is(err, usecase.ErrSelfRequest) || errors.Is(err, usecase.ErrAddressRequired) {
+		if errors.Is(err, usecase.ErrSelfRequest) || errors.Is(err, usecase.ErrAddressRequired) || errors.Is(err, usecase.ErrAddressNotFound) {
 			status = http.StatusBadRequest
 		}
 		c.JSON(status, gin.H{"error": err.Error()})

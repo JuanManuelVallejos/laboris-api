@@ -50,20 +50,3 @@ func (uc *MeUseCase) UpdateMyProfessional(clerkID, trade, homeAddress, bio strin
 	}
 	return uc.professionals.UpdateByUserID(user.ID, trade, homeAddress, bio, lat, lng, radiusKm)
 }
-
-// UpdateMyAddress actualiza el domicilio del cliente (no del profesional —
-// ver UpdateMyProfessional para eso), usado desde Perfil.
-func (uc *MeUseCase) UpdateMyAddress(clerkID, address string) error {
-	user, err := uc.users.FindByClerkID(clerkID)
-	if err != nil {
-		return err
-	}
-	if user == nil {
-		return ErrUserNotOnboarded
-	}
-	lat, lng, err := uc.geo.Geocode(context.Background(), address)
-	if err != nil {
-		return err
-	}
-	return uc.users.UpdateHomeAddress(user.ID, address, lat, lng)
-}

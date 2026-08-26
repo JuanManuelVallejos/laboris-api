@@ -41,6 +41,14 @@ func (r *UserRepository) UpdateHomeAddress(userID, address string, lat, lng floa
 	return err
 }
 
+func (r *UserRepository) ClearHomeAddress(userID string) error {
+	_, err := r.db.Exec(context.Background(),
+		`UPDATE users SET home_address = NULL, home_lat = NULL, home_lng = NULL WHERE id = $1`,
+		userID,
+	)
+	return err
+}
+
 func (r *UserRepository) SoftDeleteByClerkID(clerkID string) error {
 	_, err := r.db.Exec(context.Background(),
 		`UPDATE users SET deleted_at = NOW() WHERE clerk_id = $1`, clerkID)

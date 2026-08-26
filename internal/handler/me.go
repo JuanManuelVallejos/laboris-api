@@ -60,29 +60,3 @@ func (h *MeHandler) UpdateMyProfessional(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, prof)
 }
-
-type updateAddressRequest struct {
-	HomeAddress string `json:"homeAddress" binding:"required"`
-}
-
-func (h *MeHandler) UpdateMyAddress(c *gin.Context) {
-	var req updateAddressRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-	clerkID := c.GetString("userId")
-	if err := h.uc.UpdateMyAddress(clerkID, req.HomeAddress); err != nil {
-		if errors.Is(err, geocoding.ErrNoResults) {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-			return
-		}
-		if errors.Is(err, usecase.ErrUserNotOnboarded) {
-			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
-			return
-		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-	c.Status(http.StatusNoContent)
-}

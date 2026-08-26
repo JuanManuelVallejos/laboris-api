@@ -20,11 +20,11 @@ func NewRequestRepository(db *pgxpool.Pool) *RequestRepository {
 
 func (r *RequestRepository) Create(req *domain.Request) (*domain.Request, error) {
 	err := r.db.QueryRow(context.Background(), `
-		INSERT INTO requests (client_id, professional_id, description)
-		VALUES ($1, $2, $3)
-		RETURNING id, client_id, professional_id, description, status, COALESCE(rejection_reason,''), created_at
-	`, req.ClientID, req.ProfessionalID, req.Description,
-	).Scan(&req.ID, &req.ClientID, &req.ProfessionalID, &req.Description, &req.Status, &req.RejectionReason, &req.CreatedAt)
+		INSERT INTO requests (client_id, professional_id, description, address_id)
+		VALUES ($1, $2, $3, $4)
+		RETURNING id, client_id, professional_id, description, status, COALESCE(rejection_reason,''), address_id, created_at
+	`, req.ClientID, req.ProfessionalID, req.Description, req.AddressID,
+	).Scan(&req.ID, &req.ClientID, &req.ProfessionalID, &req.Description, &req.Status, &req.RejectionReason, &req.AddressID, &req.CreatedAt)
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == "23505" &&

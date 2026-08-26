@@ -9,7 +9,7 @@ import (
 	"github.com/laboris/laboris-api/internal/middleware"
 )
 
-func NewRouter(ph *ProfessionalHandler, oh *OnboardingHandler, mh *MeHandler, rh *RequestHandler, nh *NotificationHandler, ah *AdminHandler, jh *JobHandler, atth *AttachmentHandler, wh *ClerkWebhookHandler, db *pgxpool.Pool) *gin.Engine {
+func NewRouter(ph *ProfessionalHandler, oh *OnboardingHandler, mh *MeHandler, rh *RequestHandler, nh *NotificationHandler, ah *AdminHandler, jh *JobHandler, atth *AttachmentHandler, wh *ClerkWebhookHandler, adh *AddressHandler, db *pgxpool.Pool) *gin.Engine {
 	r := gin.Default()
 
 	r.Use(cors.New(cors.Config{
@@ -50,12 +50,19 @@ func NewRouter(ph *ProfessionalHandler, oh *OnboardingHandler, mh *MeHandler, rh
 		priv.POST("/onboarding", oh.Complete)
 		priv.GET("/me/professional", mh.GetMyProfessional)
 		priv.PUT("/me/professional", mh.UpdateMyProfessional)
-		priv.PUT("/me/address", mh.UpdateMyAddress)
 		priv.POST("/requests", rh.Create)
 		priv.GET("/me/requests/received", rh.ListReceived)
 		priv.GET("/me/requests/sent", rh.ListSent)
 		priv.GET("/requests/:id", rh.GetReceivedDetail)
 		priv.PATCH("/requests/:id", rh.UpdateStatus)
+
+		if adh != nil {
+			priv.GET("/me/addresses", adh.List)
+			priv.POST("/me/addresses", adh.Create)
+			priv.PUT("/me/addresses/:id", adh.Update)
+			priv.DELETE("/me/addresses/:id", adh.Delete)
+			priv.PATCH("/me/addresses/:id/default", adh.SetDefault)
+		}
 
 		if nh != nil {
 			priv.GET("/me/notifications", nh.List)
