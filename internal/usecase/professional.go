@@ -20,16 +20,22 @@ var ErrUserNotOnboarded = errors.New("todavía no completaste el registro")
 type ProfessionalUseCase interface {
 	GetAll(clerkID string) ([]domain.Professional, error)
 	GetByID(id string) (*domain.Professional, error)
+	// CheckAddressDistance valida un domicilio guardado del cliente contra el
+	// radio de alcance de un profesional puntual — se usa cuando el cliente
+	// cambia de domicilio ya dentro del flujo de pedir presupuesto, después
+	// de haber entrado por el listado filtrado por su domicilio activo.
+	CheckAddressDistance(clerkID, professionalID, addressID string) (distanceKm float64, withinRadius bool, err error)
 }
 
 type professionalUseCase struct {
-	repo    domain.ProfessionalRepository
-	users   domain.UserRepository
-	storage *storage.SupabaseClient
+	repo      domain.ProfessionalRepository
+	users     domain.UserRepository
+	addresses domain.AddressRepository
+	storage   *storage.SupabaseClient
 }
 
-func NewProfessionalUseCase(repo domain.ProfessionalRepository, users domain.UserRepository, storageClient *storage.SupabaseClient) ProfessionalUseCase {
-	return &professionalUseCase{repo: repo, users: users, storage: storageClient}
+func NewProfessionalUseCase(repo domain.ProfessionalRepository, users domain.UserRepository, addresses domain.AddressRepository, storageClient *storage.SupabaseClient) ProfessionalUseCase {
+	return &professionalUseCase{repo: repo, users: users, addresses: addresses, storage: storageClient}
 }
 
 // GetAll devuelve los profesionales cuyo radio de alcance cubre el domicilio
@@ -56,4 +62,28 @@ func (uc *professionalUseCase) GetByID(id string) (*domain.Professional, error) 
 	}
 	signAttachments(uc.storage, p.PortfolioPhotos)
 	return p, nil
+}
+
+func (uc *professionalUseCase) CheckAddressDistance(clerkID, professionalID, addressID string) (float64, bool, error) {
+	user, err := uc.users.FindByClerkID(clerkID)
+	if err != nil {
+		return 0, false, err
+	}
+	if user == nil {
+		return 0, false, ErrUserNotOnboarded
+	}
+
+	addr, err := uc.addresses.FindByID(addressID)
+	if err != nil {
+		return 0, false, err
+	}
+	if addr == nil || addr.UserID != user.ID {
+		return 0, false, ErrAddressNotFound
+	}
+
+	distanceKm, radiusKm, err := uc.repo.DistanceToPoint(professionalID, addr.Lat, addr.Lng)
+	if err != nil {
+		return 0, false, err
+	}
+	return distanceKm, distanceKm <= float64(radiusKm), nil
 }

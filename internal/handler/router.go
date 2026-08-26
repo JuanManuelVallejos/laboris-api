@@ -47,6 +47,7 @@ func NewRouter(ph *ProfessionalHandler, oh *OnboardingHandler, mh *MeHandler, rh
 		// El listado ahora filtra por distancia al domicilio de quien
 		// pregunta, así que necesita saber quién es — dejó de ser público.
 		priv.GET("/professionals", ph.GetAll)
+		priv.GET("/professionals/:id/address-check", ph.CheckAddressDistance)
 		priv.POST("/onboarding", oh.Complete)
 		priv.GET("/me/professional", mh.GetMyProfessional)
 		priv.PUT("/me/professional", mh.UpdateMyProfessional)

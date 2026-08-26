@@ -89,7 +89,7 @@ func main() {
 
 		attachmentUC := usecase.NewAttachmentUseCase(attachmentRepo, userRepo, profRepo, reqRepo, storageClient)
 
-		ph = handler.NewProfessionalHandler(usecase.NewProfessionalUseCase(profRepo, userRepo, storageClient))
+		ph = handler.NewProfessionalHandler(usecase.NewProfessionalUseCase(profRepo, userRepo, addressRepo, storageClient))
 		oh = handler.NewOnboardingHandler(usecase.NewOnboardingUseCase(userRepo, profRepo, geoClient))
 		mh = handler.NewMeHandler(usecase.NewMeUseCase(userRepo, profRepo, storageClient, geoClient))
 		rh = handler.NewRequestHandler(reqUC)
@@ -105,7 +105,7 @@ func main() {
 		log.Println("using PostgreSQL")
 	} else {
 		profRepo := repomemory.NewProfessionalRepository()
-		ph = handler.NewProfessionalHandler(usecase.NewProfessionalUseCase(profRepo, nil, storageClient))
+		ph = handler.NewProfessionalHandler(usecase.NewProfessionalUseCase(profRepo, nil, nil, storageClient))
 		oh = handler.NewOnboardingHandler(usecase.NewOnboardingUseCase(nil, nil, geoClient))
 		mh = handler.NewMeHandler(usecase.NewMeUseCase(nil, profRepo, storageClient, geoClient))
 		rh = handler.NewRequestHandler(usecase.NewRequestUseCase(nil, nil, profRepo))

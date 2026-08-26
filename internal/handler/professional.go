@@ -43,3 +43,23 @@ func (h *ProfessionalHandler) GetByID(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, professional)
 }
+
+func (h *ProfessionalHandler) CheckAddressDistance(c *gin.Context) {
+	id := c.Param("id")
+	addressID := c.Query("addressId")
+	if addressID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "addressId is required"})
+		return
+	}
+	clerkID := c.GetString("userId")
+	distanceKm, withinRadius, err := h.uc.CheckAddressDistance(clerkID, id, addressID)
+	if err != nil {
+		status := http.StatusInternalServerError
+		if errors.Is(err, usecase.ErrUserNotOnboarded) || errors.Is(err, usecase.ErrAddressNotFound) {
+			status = http.StatusNotFound
+		}
+		c.JSON(status, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"distanceKm": distanceKm, "withinRadius": withinRadius})
+}

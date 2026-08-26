@@ -24,6 +24,10 @@ func (r *professionalRepository) FindNear(clientLat, clientLng float64) ([]domai
 	return nil, nil
 }
 
+func (r *professionalRepository) DistanceToPoint(professionalID string, lat, lng float64) (float64, int, error) {
+	return 0, 0, nil
+}
+
 func (r *professionalRepository) FindByID(id string) (*domain.Professional, error) {
 	for _, p := range r.data {
 		if p.ID == id {

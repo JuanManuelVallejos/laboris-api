@@ -1,12 +1,12 @@
 package domain
 
 type Professional struct {
-	ID          string  `json:"id"`
-	UserID      string  `json:"userId"`
-	Name        string  `json:"name"`
-	AvatarURL   string  `json:"avatarUrl"`
-	Trade       string  `json:"trade"`
-	HomeAddress string  `json:"homeAddress"`
+	ID          string `json:"id"`
+	UserID      string `json:"userId"`
+	Name        string `json:"name"`
+	AvatarURL   string `json:"avatarUrl"`
+	Trade       string `json:"trade"`
+	HomeAddress string `json:"homeAddress"`
 	// HomeLat/HomeLng nunca se serializan — la posición exacta del
 	// profesional no se expone por API, solo la distancia calculada
 	// (DistanceKm) cuando corresponde a un listado geo-filtrado.
@@ -29,6 +29,10 @@ type ProfessionalRepository interface {
 	// reemplaza al viejo listado por zona. DistanceKm queda completo en
 	// cada resultado.
 	FindNear(clientLat, clientLng float64) ([]Professional, error)
+	// DistanceToPoint devuelve la distancia (km) de un profesional puntual a
+	// (lat, lng) y su radio de alcance — usado para validar un domicilio
+	// elegido después de entrar a pedir presupuesto.
+	DistanceToPoint(professionalID string, lat, lng float64) (distanceKm float64, radiusKm int, err error)
 	FindByID(id string) (*Professional, error)
 	FindByUserID(userID string) (*Professional, error)
 	Create(p *Professional) (*Professional, error)

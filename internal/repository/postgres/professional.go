@@ -65,6 +65,19 @@ func (r *ProfessionalRepository) FindNear(clientLat, clientLng float64) ([]domai
 	return result, nil
 }
 
+// DistanceToPoint calcula qué tan lejos está (lat, lng) del domicilio de un
+// profesional puntual, y devuelve también su radio de alcance — usado para
+// avisarle al cliente si un domicilio elegido queda fuera de rango, sin
+// exponer nunca la ubicación exacta del profesional.
+func (r *ProfessionalRepository) DistanceToPoint(professionalID string, lat, lng float64) (distanceKm float64, radiusKm int, err error) {
+	err = r.db.QueryRow(context.Background(), `
+		SELECT `+distanceKmExpr+`, p.radius_km
+		FROM professionals p
+		WHERE p.id = $3 AND p.home_lat IS NOT NULL AND p.home_lng IS NOT NULL AND p.radius_km IS NOT NULL
+	`, lat, lng, professionalID).Scan(&distanceKm, &radiusKm)
+	return distanceKm, radiusKm, err
+}
+
 func (r *ProfessionalRepository) FindByID(id string) (*domain.Professional, error) {
 	p := &domain.Professional{}
 	err := r.db.QueryRow(context.Background(), `
