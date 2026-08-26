@@ -59,7 +59,7 @@ func (uc *MeUseCase) UpdateMyAddress(clerkID, address string) error {
 		return err
 	}
 	if user == nil {
-		return errors.New("user not found")
+		return ErrUserNotOnboarded
 	}
 	lat, lng, err := uc.geo.Geocode(context.Background(), address)
 	if err != nil {

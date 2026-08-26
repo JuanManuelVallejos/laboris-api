@@ -11,6 +11,12 @@ import (
 // usuario (para calcular distancia) y todavía no lo cargó.
 var ErrAddressRequired = errors.New("necesitás cargar tu domicilio antes de continuar")
 
+// ErrUserNotOnboarded se devuelve cuando el clerkID no tiene ninguna fila en
+// nuestra base (a diferencia de ErrAddressRequired, que asume que el usuario
+// existe y solo le falta el domicilio) — pasa cuando Clerk cree que el
+// onboarding está completo pero nunca llegó a crearse del lado nuestro.
+var ErrUserNotOnboarded = errors.New("todavía no completaste el registro")
+
 type ProfessionalUseCase interface {
 	GetAll(clerkID string) ([]domain.Professional, error)
 	GetByID(id string) (*domain.Professional, error)
@@ -34,7 +40,10 @@ func (uc *professionalUseCase) GetAll(clerkID string) ([]domain.Professional, er
 	if err != nil {
 		return nil, err
 	}
-	if user == nil || !user.HasHomeAddress() {
+	if user == nil {
+		return nil, ErrUserNotOnboarded
+	}
+	if !user.HasHomeAddress() {
 		return nil, ErrAddressRequired
 	}
 	return uc.repo.FindNear(*user.HomeLat, *user.HomeLng)
