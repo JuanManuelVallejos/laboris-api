@@ -9,7 +9,7 @@ import (
 	"github.com/laboris/laboris-api/internal/middleware"
 )
 
-func NewRouter(ph *ProfessionalHandler, oh *OnboardingHandler, mh *MeHandler, rh *RequestHandler, nh *NotificationHandler, ah *AdminHandler, jh *JobHandler, atth *AttachmentHandler, db *pgxpool.Pool) *gin.Engine {
+func NewRouter(ph *ProfessionalHandler, oh *OnboardingHandler, mh *MeHandler, rh *RequestHandler, nh *NotificationHandler, ah *AdminHandler, jh *JobHandler, atth *AttachmentHandler, wh *ClerkWebhookHandler, db *pgxpool.Pool) *gin.Engine {
 	r := gin.Default()
 
 	r.Use(cors.New(cors.Config{
@@ -27,6 +27,12 @@ func NewRouter(ph *ProfessionalHandler, oh *OnboardingHandler, mh *MeHandler, rh
 	})
 
 	r.GET("/ping", Ping)
+
+	// Webhook de Clerk: nunca trae el JWT de sesión (viene firmado con los
+	// headers svix-*), así que va fuera de ClerkAuth.
+	if wh != nil {
+		r.POST("/api/v1/webhooks/clerk", wh.Handle)
+	}
 
 	// Rutas públicas
 	pub := r.Group("/api/v1")

@@ -4,6 +4,7 @@ type Professional struct {
 	ID              string       `json:"id"`
 	UserID          string       `json:"userId"`
 	Name            string       `json:"name"`
+	AvatarURL       string       `json:"avatarUrl"`
 	Trade           string       `json:"trade"`
 	Zone            string       `json:"zone"`
 	Bio             string       `json:"bio"`

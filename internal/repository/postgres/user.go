@@ -20,9 +20,9 @@ func NewUserRepository(db *pgxpool.Pool) *UserRepository {
 func (r *UserRepository) FindByClerkID(clerkID string) (*domain.User, error) {
 	u := &domain.User{}
 	err := r.db.QueryRow(context.Background(),
-		`SELECT id, clerk_id, email, full_name, created_at FROM users WHERE clerk_id = $1`,
+		`SELECT id, clerk_id, email, full_name, COALESCE(avatar_url, ''), created_at, deleted_at FROM users WHERE clerk_id = $1`,
 		clerkID,
-	).Scan(&u.ID, &u.ClerkID, &u.Email, &u.FullName, &u.CreatedAt)
+	).Scan(&u.ID, &u.ClerkID, &u.Email, &u.FullName, &u.AvatarURL, &u.CreatedAt, &u.DeletedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}
@@ -30,6 +30,18 @@ func (r *UserRepository) FindByClerkID(clerkID string) (*domain.User, error) {
 		return nil, err
 	}
 	return u, nil
+}
+
+func (r *UserRepository) SoftDeleteByClerkID(clerkID string) error {
+	_, err := r.db.Exec(context.Background(),
+		`UPDATE users SET deleted_at = NOW() WHERE clerk_id = $1`, clerkID)
+	return err
+}
+
+func (r *UserRepository) UpdateAvatarURLByClerkID(clerkID, avatarURL string) error {
+	_, err := r.db.Exec(context.Background(),
+		`UPDATE users SET avatar_url = $2 WHERE clerk_id = $1`, clerkID, avatarURL)
+	return err
 }
 
 func (r *UserRepository) Create(user *domain.User) (*domain.User, error) {
@@ -58,7 +70,7 @@ func (r *UserRepository) FindAllPaginated(page, limit int) ([]domain.UserWithRol
 	}
 
 	rows, err := r.db.Query(context.Background(), `
-		SELECT u.id, u.clerk_id, u.email, u.full_name, u.created_at,
+		SELECT u.id, u.clerk_id, u.email, u.full_name, COALESCE(u.avatar_url, ''), u.created_at, u.deleted_at,
 		       COALESCE(array_agg(ur.role) FILTER (WHERE ur.role IS NOT NULL), '{}') AS roles
 		FROM users u
 		LEFT JOIN user_roles ur ON ur.user_id = u.id
@@ -74,7 +86,7 @@ func (r *UserRepository) FindAllPaginated(page, limit int) ([]domain.UserWithRol
 	result := make([]domain.UserWithRoles, 0)
 	for rows.Next() {
 		var uw domain.UserWithRoles
-		if err := rows.Scan(&uw.ID, &uw.ClerkID, &uw.Email, &uw.FullName, &uw.CreatedAt, &uw.Roles); err != nil {
+		if err := rows.Scan(&uw.ID, &uw.ClerkID, &uw.Email, &uw.FullName, &uw.AvatarURL, &uw.CreatedAt, &uw.DeletedAt, &uw.Roles); err != nil {
 			return nil, 0, err
 		}
 		result = append(result, uw)

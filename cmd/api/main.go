@@ -35,6 +35,7 @@ func main() {
 	var ah *handler.AdminHandler
 	var jh *handler.JobHandler
 	var atth *handler.AttachmentHandler
+	var wh *handler.ClerkWebhookHandler
 	var pool *pgxpool.Pool
 
 	if cfg.DatabaseURL != "" {
@@ -91,6 +92,9 @@ func main() {
 		ah = handler.NewAdminHandler(usecase.NewAdminUseCase(userRepo, profRepo))
 		jh = handler.NewJobHandler(jobUC, msgUC, sseConnLimiter)
 		atth = handler.NewAttachmentHandler(attachmentUC)
+		if cfg.ClerkWebhookSecret != "" {
+			wh = handler.NewClerkWebhookHandler(usecase.NewUserSyncUseCase(userRepo), cfg.ClerkWebhookSecret)
+		}
 
 		log.Println("using PostgreSQL")
 	} else {
@@ -103,7 +107,7 @@ func main() {
 		log.Println("using in-memory repository (no DATABASE_URL set)")
 	}
 
-	r := handler.NewRouter(ph, oh, mh, rh, nh, ah, jh, atth, pool)
+	r := handler.NewRouter(ph, oh, mh, rh, nh, ah, jh, atth, wh, pool)
 
 	// WriteTimeout deliberately left unset: it's the only timeout that would
 	// cut off long-lived SSE streams (job/message/notification updates),

@@ -19,13 +19,13 @@ func NewProfessionalRepository(db *pgxpool.Pool) *ProfessionalRepository {
 
 func (r *ProfessionalRepository) FindAll() ([]domain.Professional, error) {
 	rows, err := r.db.Query(context.Background(), `
-		SELECT p.id, p.user_id, u.full_name, p.trade, p.zone, p.bio, p.verified, p.status,
+		SELECT p.id, p.user_id, u.full_name, COALESCE(u.avatar_url, '') AS avatar_url, p.trade, p.zone, p.bio, p.verified, p.status,
 		       COALESCE(AVG(rv.rating), 0) AS rating
 		FROM professionals p
 		JOIN users u ON u.id = p.user_id
 		LEFT JOIN reviews rv ON rv.professional_id = p.id
 		WHERE p.status = 'active'
-		GROUP BY p.id, u.full_name
+		GROUP BY p.id, u.full_name, u.avatar_url
 		ORDER BY rating DESC
 	`)
 	if err != nil {
@@ -36,7 +36,7 @@ func (r *ProfessionalRepository) FindAll() ([]domain.Professional, error) {
 	result := make([]domain.Professional, 0)
 	for rows.Next() {
 		var p domain.Professional
-		if err := rows.Scan(&p.ID, &p.UserID, &p.Name, &p.Trade, &p.Zone, &p.Bio, &p.Verified, &p.Status, &p.Rating); err != nil {
+		if err := rows.Scan(&p.ID, &p.UserID, &p.Name, &p.AvatarURL, &p.Trade, &p.Zone, &p.Bio, &p.Verified, &p.Status, &p.Rating); err != nil {
 			return nil, err
 		}
 		result = append(result, p)
@@ -47,14 +47,14 @@ func (r *ProfessionalRepository) FindAll() ([]domain.Professional, error) {
 func (r *ProfessionalRepository) FindByID(id string) (*domain.Professional, error) {
 	p := &domain.Professional{}
 	err := r.db.QueryRow(context.Background(), `
-		SELECT p.id, p.user_id, u.full_name, p.trade, p.zone, p.bio, p.verified, p.status,
+		SELECT p.id, p.user_id, u.full_name, COALESCE(u.avatar_url, '') AS avatar_url, p.trade, p.zone, p.bio, p.verified, p.status,
 		       COALESCE(AVG(rv.rating), 0) AS rating
 		FROM professionals p
 		JOIN users u ON u.id = p.user_id
 		LEFT JOIN reviews rv ON rv.professional_id = p.id
 		WHERE p.id = $1
-		GROUP BY p.id, u.full_name
-	`, id).Scan(&p.ID, &p.UserID, &p.Name, &p.Trade, &p.Zone, &p.Bio, &p.Verified, &p.Status, &p.Rating)
+		GROUP BY p.id, u.full_name, u.avatar_url
+	`, id).Scan(&p.ID, &p.UserID, &p.Name, &p.AvatarURL, &p.Trade, &p.Zone, &p.Bio, &p.Verified, &p.Status, &p.Rating)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}
@@ -72,14 +72,14 @@ func (r *ProfessionalRepository) FindByID(id string) (*domain.Professional, erro
 func (r *ProfessionalRepository) FindByUserID(userID string) (*domain.Professional, error) {
 	p := &domain.Professional{}
 	err := r.db.QueryRow(context.Background(), `
-		SELECT p.id, p.user_id, u.full_name, p.trade, p.zone, p.bio, p.verified, p.status,
+		SELECT p.id, p.user_id, u.full_name, COALESCE(u.avatar_url, '') AS avatar_url, p.trade, p.zone, p.bio, p.verified, p.status,
 		       COALESCE(AVG(rv.rating), 0) AS rating
 		FROM professionals p
 		JOIN users u ON u.id = p.user_id
 		LEFT JOIN reviews rv ON rv.professional_id = p.id
 		WHERE p.user_id = $1
-		GROUP BY p.id, u.full_name
-	`, userID).Scan(&p.ID, &p.UserID, &p.Name, &p.Trade, &p.Zone, &p.Bio, &p.Verified, &p.Status, &p.Rating)
+		GROUP BY p.id, u.full_name, u.avatar_url
+	`, userID).Scan(&p.ID, &p.UserID, &p.Name, &p.AvatarURL, &p.Trade, &p.Zone, &p.Bio, &p.Verified, &p.Status, &p.Rating)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}
@@ -152,12 +152,12 @@ func (r *ProfessionalRepository) FindAllPaginated(page, limit int) ([]domain.Pro
 	}
 
 	rows, err := r.db.Query(context.Background(), `
-		SELECT p.id, p.user_id, u.full_name, p.trade, p.zone, p.bio, p.verified, p.status,
+		SELECT p.id, p.user_id, u.full_name, COALESCE(u.avatar_url, '') AS avatar_url, p.trade, p.zone, p.bio, p.verified, p.status,
 		       COALESCE(AVG(rv.rating), 0) AS rating
 		FROM professionals p
 		JOIN users u ON u.id = p.user_id
 		LEFT JOIN reviews rv ON rv.professional_id = p.id
-		GROUP BY p.id, u.full_name
+		GROUP BY p.id, u.full_name, u.avatar_url
 		ORDER BY p.status ASC, u.full_name ASC
 		LIMIT $1 OFFSET $2
 	`, limit, offset)
@@ -169,7 +169,7 @@ func (r *ProfessionalRepository) FindAllPaginated(page, limit int) ([]domain.Pro
 	result := make([]domain.Professional, 0)
 	for rows.Next() {
 		var p domain.Professional
-		if err := rows.Scan(&p.ID, &p.UserID, &p.Name, &p.Trade, &p.Zone, &p.Bio, &p.Verified, &p.Status, &p.Rating); err != nil {
+		if err := rows.Scan(&p.ID, &p.UserID, &p.Name, &p.AvatarURL, &p.Trade, &p.Zone, &p.Bio, &p.Verified, &p.Status, &p.Rating); err != nil {
 			return nil, 0, err
 		}
 		result = append(result, p)

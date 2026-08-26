@@ -10,6 +10,7 @@ import (
 type Config struct {
 	Port                   string
 	ClerkSecretKey         string
+	ClerkWebhookSecret     string
 	DatabaseURL            string
 	JobAutoCloseDays       int
 	SupabaseURL            string
@@ -40,6 +41,7 @@ func Load() *Config {
 	return &Config{
 		Port:                   port,
 		ClerkSecretKey:         os.Getenv("CLERK_SECRET_KEY"),
+		ClerkWebhookSecret:     os.Getenv("CLERK_WEBHOOK_SECRET"),
 		DatabaseURL:            os.Getenv("DATABASE_URL"),
 		JobAutoCloseDays:       autoCloseDays,
 		SupabaseURL:            os.Getenv("SUPABASE_URL"),
