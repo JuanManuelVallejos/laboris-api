@@ -3,13 +3,22 @@ package domain
 import "time"
 
 type User struct {
-	ID        string     `json:"id"`
-	ClerkID   string     `json:"clerkId"`
-	Email     string     `json:"email"`
-	FullName  string     `json:"fullName"`
-	AvatarURL string     `json:"avatarUrl"`
-	CreatedAt time.Time  `json:"createdAt"`
-	DeletedAt *time.Time `json:"deletedAt"`
+	ID          string     `json:"id"`
+	ClerkID     string     `json:"clerkId"`
+	Email       string     `json:"email"`
+	FullName    string     `json:"fullName"`
+	AvatarURL   string     `json:"avatarUrl"`
+	HomeAddress string     `json:"homeAddress"`
+	HomeLat     *float64   `json:"-"`
+	HomeLng     *float64   `json:"-"`
+	CreatedAt   time.Time  `json:"createdAt"`
+	DeletedAt   *time.Time `json:"deletedAt"`
+}
+
+// HasHomeAddress indica si el usuario ya cargó su domicilio — requisito
+// para ver el listado de profesionales y para pedir presupuesto.
+func (u *User) HasHomeAddress() bool {
+	return u.HomeLat != nil && u.HomeLng != nil
 }
 
 type UserWithRoles struct {
@@ -24,4 +33,5 @@ type UserRepository interface {
 	FindAllPaginated(page, limit int) ([]UserWithRoles, int64, error)
 	SoftDeleteByClerkID(clerkID string) error
 	UpdateAvatarURLByClerkID(clerkID, avatarURL string) error
+	UpdateHomeAddress(userID, address string, lat, lng float64) error
 }

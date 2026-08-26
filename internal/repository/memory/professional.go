@@ -13,15 +13,15 @@ type professionalRepository struct {
 func NewProfessionalRepository() domain.ProfessionalRepository {
 	return &professionalRepository{
 		data: []domain.Professional{
-			{ID: "1", Name: "Tomás Rivas", Trade: "plomero", Zone: "Zona Sur", Rating: 4.8, Verified: true},
-			{ID: "2", Name: "Carlos Méndez", Trade: "electricista", Zone: "CABA", Rating: 4.5, Verified: true},
-			{ID: "3", Name: "Roberto Giménez", Trade: "gasista", Zone: "CABA", Rating: 4.9, Verified: true},
+			{ID: "1", Name: "Tomás Rivas", Trade: "plomero", Rating: 4.8, Verified: true},
+			{ID: "2", Name: "Carlos Méndez", Trade: "electricista", Rating: 4.5, Verified: true},
+			{ID: "3", Name: "Roberto Giménez", Trade: "gasista", Rating: 4.9, Verified: true},
 		},
 	}
 }
 
-func (r *professionalRepository) FindAll() ([]domain.Professional, error) {
-	return r.data, nil
+func (r *professionalRepository) FindNear(clientLat, clientLng float64) ([]domain.Professional, error) {
+	return nil, nil
 }
 
 func (r *professionalRepository) FindByID(id string) (*domain.Professional, error) {
@@ -42,11 +42,14 @@ func (r *professionalRepository) FindByUserID(userID string) (*domain.Profession
 	return nil, nil
 }
 
-func (r *professionalRepository) UpdateByUserID(userID, trade, zone, bio string) (*domain.Professional, error) {
+func (r *professionalRepository) UpdateByUserID(userID, trade, homeAddress, bio string, homeLat, homeLng float64, radiusKm int) (*domain.Professional, error) {
 	for i, p := range r.data {
 		if p.UserID == userID {
 			r.data[i].Trade = trade
-			r.data[i].Zone = zone
+			r.data[i].HomeAddress = homeAddress
+			r.data[i].HomeLat = &homeLat
+			r.data[i].HomeLng = &homeLng
+			r.data[i].RadiusKm = &radiusKm
 			r.data[i].Bio = bio
 			return &r.data[i], nil
 		}

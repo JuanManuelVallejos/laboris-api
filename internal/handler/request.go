@@ -31,7 +31,7 @@ func (h *RequestHandler) Create(c *gin.Context) {
 	r, err := h.uc.Create(clerkID, req.ProfessionalID, req.Description)
 	if err != nil {
 		status := http.StatusInternalServerError
-		if errors.Is(err, usecase.ErrSelfRequest) {
+		if errors.Is(err, usecase.ErrSelfRequest) || errors.Is(err, usecase.ErrAddressRequired) {
 			status = http.StatusBadRequest
 		}
 		c.JSON(status, gin.H{"error": err.Error()})

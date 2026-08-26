@@ -20,9 +20,10 @@ func NewUserRepository(db *pgxpool.Pool) *UserRepository {
 func (r *UserRepository) FindByClerkID(clerkID string) (*domain.User, error) {
 	u := &domain.User{}
 	err := r.db.QueryRow(context.Background(),
-		`SELECT id, clerk_id, email, full_name, COALESCE(avatar_url, ''), created_at, deleted_at FROM users WHERE clerk_id = $1`,
+		`SELECT id, clerk_id, email, full_name, COALESCE(avatar_url, ''), COALESCE(home_address, ''), home_lat, home_lng, created_at, deleted_at
+		 FROM users WHERE clerk_id = $1`,
 		clerkID,
-	).Scan(&u.ID, &u.ClerkID, &u.Email, &u.FullName, &u.AvatarURL, &u.CreatedAt, &u.DeletedAt)
+	).Scan(&u.ID, &u.ClerkID, &u.Email, &u.FullName, &u.AvatarURL, &u.HomeAddress, &u.HomeLat, &u.HomeLng, &u.CreatedAt, &u.DeletedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}
@@ -30,6 +31,14 @@ func (r *UserRepository) FindByClerkID(clerkID string) (*domain.User, error) {
 		return nil, err
 	}
 	return u, nil
+}
+
+func (r *UserRepository) UpdateHomeAddress(userID, address string, lat, lng float64) error {
+	_, err := r.db.Exec(context.Background(),
+		`UPDATE users SET home_address = $2, home_lat = $3, home_lng = $4 WHERE id = $1`,
+		userID, address, lat, lng,
+	)
+	return err
 }
 
 func (r *UserRepository) SoftDeleteByClerkID(clerkID string) error {

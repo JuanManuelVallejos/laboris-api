@@ -17,17 +17,34 @@ func NewProfessionalRepository(db *pgxpool.Pool) *ProfessionalRepository {
 	return &ProfessionalRepository{db: db}
 }
 
-func (r *ProfessionalRepository) FindAll() ([]domain.Professional, error) {
+// distanceKmExpr calcula la distancia (Haversine, en km) entre el punto
+// ($1, $2) = (lat, lng) del cliente y el domicilio del profesional. El
+// LEAST/GREATEST evita que un redondeo de punto flotante empuje el argumento
+// de acos() apenas fuera de [-1, 1], lo que rompería la query con NaN.
+const distanceKmExpr = `6371 * acos(LEAST(1, GREATEST(-1,
+	cos(radians($1)) * cos(radians(p.home_lat)) * cos(radians(p.home_lng) - radians($2)) +
+	sin(radians($1)) * sin(radians(p.home_lat))
+)))`
+
+// FindNear devuelve los profesionales activos cuyo radio de alcance cubre al
+// cliente ubicado en (clientLat, clientLng) — reemplaza al viejo filtro por
+// zona. Los que no cargaron domicilio/radio quedan afuera (home_lat/home_lng/
+// radius_km NULL nunca matchean).
+func (r *ProfessionalRepository) FindNear(clientLat, clientLng float64) ([]domain.Professional, error) {
 	rows, err := r.db.Query(context.Background(), `
-		SELECT p.id, p.user_id, u.full_name, COALESCE(u.avatar_url, '') AS avatar_url, p.trade, p.zone, p.bio, p.verified, p.status,
-		       COALESCE(AVG(rv.rating), 0) AS rating
+		SELECT p.id, p.user_id, u.full_name, COALESCE(u.avatar_url, '') AS avatar_url, p.trade,
+		       COALESCE(p.home_address, ''), p.radius_km, p.bio, p.verified, p.status,
+		       COALESCE(AVG(rv.rating), 0) AS rating,
+		       `+distanceKmExpr+` AS distance_km
 		FROM professionals p
 		JOIN users u ON u.id = p.user_id
 		LEFT JOIN reviews rv ON rv.professional_id = p.id
 		WHERE p.status = 'active'
+		  AND p.home_lat IS NOT NULL AND p.home_lng IS NOT NULL AND p.radius_km IS NOT NULL
 		GROUP BY p.id, u.full_name, u.avatar_url
-		ORDER BY rating DESC
-	`)
+		HAVING `+distanceKmExpr+` <= p.radius_km
+		ORDER BY distance_km ASC
+	`, clientLat, clientLng)
 	if err != nil {
 		return nil, err
 	}
@@ -36,7 +53,11 @@ func (r *ProfessionalRepository) FindAll() ([]domain.Professional, error) {
 	result := make([]domain.Professional, 0)
 	for rows.Next() {
 		var p domain.Professional
-		if err := rows.Scan(&p.ID, &p.UserID, &p.Name, &p.AvatarURL, &p.Trade, &p.Zone, &p.Bio, &p.Verified, &p.Status, &p.Rating); err != nil {
+		if err := rows.Scan(
+			&p.ID, &p.UserID, &p.Name, &p.AvatarURL, &p.Trade,
+			&p.HomeAddress, &p.RadiusKm, &p.Bio, &p.Verified, &p.Status,
+			&p.Rating, &p.DistanceKm,
+		); err != nil {
 			return nil, err
 		}
 		result = append(result, p)
@@ -47,14 +68,15 @@ func (r *ProfessionalRepository) FindAll() ([]domain.Professional, error) {
 func (r *ProfessionalRepository) FindByID(id string) (*domain.Professional, error) {
 	p := &domain.Professional{}
 	err := r.db.QueryRow(context.Background(), `
-		SELECT p.id, p.user_id, u.full_name, COALESCE(u.avatar_url, '') AS avatar_url, p.trade, p.zone, p.bio, p.verified, p.status,
+		SELECT p.id, p.user_id, u.full_name, COALESCE(u.avatar_url, '') AS avatar_url, p.trade,
+		       COALESCE(p.home_address, ''), p.radius_km, p.bio, p.verified, p.status,
 		       COALESCE(AVG(rv.rating), 0) AS rating
 		FROM professionals p
 		JOIN users u ON u.id = p.user_id
 		LEFT JOIN reviews rv ON rv.professional_id = p.id
 		WHERE p.id = $1
 		GROUP BY p.id, u.full_name, u.avatar_url
-	`, id).Scan(&p.ID, &p.UserID, &p.Name, &p.AvatarURL, &p.Trade, &p.Zone, &p.Bio, &p.Verified, &p.Status, &p.Rating)
+	`, id).Scan(&p.ID, &p.UserID, &p.Name, &p.AvatarURL, &p.Trade, &p.HomeAddress, &p.RadiusKm, &p.Bio, &p.Verified, &p.Status, &p.Rating)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}
@@ -72,14 +94,15 @@ func (r *ProfessionalRepository) FindByID(id string) (*domain.Professional, erro
 func (r *ProfessionalRepository) FindByUserID(userID string) (*domain.Professional, error) {
 	p := &domain.Professional{}
 	err := r.db.QueryRow(context.Background(), `
-		SELECT p.id, p.user_id, u.full_name, COALESCE(u.avatar_url, '') AS avatar_url, p.trade, p.zone, p.bio, p.verified, p.status,
+		SELECT p.id, p.user_id, u.full_name, COALESCE(u.avatar_url, '') AS avatar_url, p.trade,
+		       COALESCE(p.home_address, ''), p.radius_km, p.bio, p.verified, p.status,
 		       COALESCE(AVG(rv.rating), 0) AS rating
 		FROM professionals p
 		JOIN users u ON u.id = p.user_id
 		LEFT JOIN reviews rv ON rv.professional_id = p.id
 		WHERE p.user_id = $1
 		GROUP BY p.id, u.full_name, u.avatar_url
-	`, userID).Scan(&p.ID, &p.UserID, &p.Name, &p.AvatarURL, &p.Trade, &p.Zone, &p.Bio, &p.Verified, &p.Status, &p.Rating)
+	`, userID).Scan(&p.ID, &p.UserID, &p.Name, &p.AvatarURL, &p.Trade, &p.HomeAddress, &p.RadiusKm, &p.Bio, &p.Verified, &p.Status, &p.Rating)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}
@@ -120,13 +143,14 @@ func (r *ProfessionalRepository) fetchPortfolioPhotos(professionalID string) ([]
 	return photos, nil
 }
 
-func (r *ProfessionalRepository) UpdateByUserID(userID, trade, zone, bio string) (*domain.Professional, error) {
+func (r *ProfessionalRepository) UpdateByUserID(userID, trade, homeAddress, bio string, homeLat, homeLng float64, radiusKm int) (*domain.Professional, error) {
 	p := &domain.Professional{}
 	err := r.db.QueryRow(context.Background(), `
-		UPDATE professionals SET trade = $2, zone = $3, bio = $4
+		UPDATE professionals SET trade = $2, home_address = $3, home_lat = $4, home_lng = $5, radius_km = $6, bio = $7
 		WHERE user_id = $1
-		RETURNING id, user_id, trade, zone, bio, verified, status
-	`, userID, trade, zone, bio).Scan(&p.ID, &p.UserID, &p.Trade, &p.Zone, &p.Bio, &p.Verified, &p.Status)
+		RETURNING id, user_id, trade, home_address, radius_km, bio, verified, status
+	`, userID, trade, homeAddress, homeLat, homeLng, radiusKm, bio).
+		Scan(&p.ID, &p.UserID, &p.Trade, &p.HomeAddress, &p.RadiusKm, &p.Bio, &p.Verified, &p.Status)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}
@@ -135,11 +159,15 @@ func (r *ProfessionalRepository) UpdateByUserID(userID, trade, zone, bio string)
 
 func (r *ProfessionalRepository) Create(p *domain.Professional) (*domain.Professional, error) {
 	err := r.db.QueryRow(context.Background(),
-		`INSERT INTO professionals (user_id, trade, zone, bio) VALUES ($1, $2, $3, $4)
-		 ON CONFLICT (user_id) DO UPDATE SET trade = EXCLUDED.trade, zone = EXCLUDED.zone, bio = EXCLUDED.bio
-		 RETURNING id, user_id, trade, zone, bio, verified, status`,
-		p.UserID, p.Trade, p.Zone, p.Bio,
-	).Scan(&p.ID, &p.UserID, &p.Trade, &p.Zone, &p.Bio, &p.Verified, &p.Status)
+		`INSERT INTO professionals (user_id, trade, home_address, home_lat, home_lng, radius_km, bio)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7)
+		 ON CONFLICT (user_id) DO UPDATE SET
+		   trade = EXCLUDED.trade, home_address = EXCLUDED.home_address,
+		   home_lat = EXCLUDED.home_lat, home_lng = EXCLUDED.home_lng,
+		   radius_km = EXCLUDED.radius_km, bio = EXCLUDED.bio
+		 RETURNING id, user_id, trade, home_address, radius_km, bio, verified, status`,
+		p.UserID, p.Trade, p.HomeAddress, p.HomeLat, p.HomeLng, p.RadiusKm, p.Bio,
+	).Scan(&p.ID, &p.UserID, &p.Trade, &p.HomeAddress, &p.RadiusKm, &p.Bio, &p.Verified, &p.Status)
 	return p, err
 }
 
@@ -152,7 +180,8 @@ func (r *ProfessionalRepository) FindAllPaginated(page, limit int) ([]domain.Pro
 	}
 
 	rows, err := r.db.Query(context.Background(), `
-		SELECT p.id, p.user_id, u.full_name, COALESCE(u.avatar_url, '') AS avatar_url, p.trade, p.zone, p.bio, p.verified, p.status,
+		SELECT p.id, p.user_id, u.full_name, COALESCE(u.avatar_url, '') AS avatar_url, p.trade,
+		       COALESCE(p.home_address, ''), p.radius_km, p.bio, p.verified, p.status,
 		       COALESCE(AVG(rv.rating), 0) AS rating
 		FROM professionals p
 		JOIN users u ON u.id = p.user_id
@@ -169,7 +198,7 @@ func (r *ProfessionalRepository) FindAllPaginated(page, limit int) ([]domain.Pro
 	result := make([]domain.Professional, 0)
 	for rows.Next() {
 		var p domain.Professional
-		if err := rows.Scan(&p.ID, &p.UserID, &p.Name, &p.AvatarURL, &p.Trade, &p.Zone, &p.Bio, &p.Verified, &p.Status, &p.Rating); err != nil {
+		if err := rows.Scan(&p.ID, &p.UserID, &p.Name, &p.AvatarURL, &p.Trade, &p.HomeAddress, &p.RadiusKm, &p.Bio, &p.Verified, &p.Status, &p.Rating); err != nil {
 			return nil, 0, err
 		}
 		result = append(result, p)

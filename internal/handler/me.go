@@ -1,9 +1,11 @@
 package handler
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/laboris/laboris-api/internal/geocoding"
 	"github.com/laboris/laboris-api/internal/usecase"
 )
 
@@ -30,9 +32,10 @@ func (h *MeHandler) GetMyProfessional(c *gin.Context) {
 }
 
 type updateProfessionalRequest struct {
-	Trade string `json:"trade" binding:"required"`
-	Zone  string `json:"zone"  binding:"required"`
-	Bio   string `json:"bio"`
+	Trade       string `json:"trade"       binding:"required"`
+	HomeAddress string `json:"homeAddress" binding:"required"`
+	RadiusKm    int    `json:"radiusKm"    binding:"required"`
+	Bio         string `json:"bio"`
 }
 
 func (h *MeHandler) UpdateMyProfessional(c *gin.Context) {
@@ -42,8 +45,12 @@ func (h *MeHandler) UpdateMyProfessional(c *gin.Context) {
 		return
 	}
 	clerkID := c.GetString("userId")
-	prof, err := h.uc.UpdateMyProfessional(clerkID, req.Trade, req.Zone, req.Bio)
+	prof, err := h.uc.UpdateMyProfessional(clerkID, req.Trade, req.HomeAddress, req.Bio, req.RadiusKm)
 	if err != nil {
+		if errors.Is(err, geocoding.ErrNoResults) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -52,4 +59,26 @@ func (h *MeHandler) UpdateMyProfessional(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, prof)
+}
+
+type updateAddressRequest struct {
+	HomeAddress string `json:"homeAddress" binding:"required"`
+}
+
+func (h *MeHandler) UpdateMyAddress(c *gin.Context) {
+	var req updateAddressRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	clerkID := c.GetString("userId")
+	if err := h.uc.UpdateMyAddress(clerkID, req.HomeAddress); err != nil {
+		if errors.Is(err, geocoding.ErrNoResults) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.Status(http.StatusNoContent)
 }

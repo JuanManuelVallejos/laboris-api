@@ -48,6 +48,9 @@ func (uc *RequestUseCase) Create(clerkID, professionalID, description string) (*
 	if user == nil {
 		return nil, errors.New("user not found")
 	}
+	if !user.HasHomeAddress() {
+		return nil, ErrAddressRequired
+	}
 
 	if uc.professionals != nil {
 		prof, err := uc.professionals.FindByID(professionalID)

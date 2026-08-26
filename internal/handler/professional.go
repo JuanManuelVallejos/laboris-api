@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -16,8 +17,13 @@ func NewProfessionalHandler(uc usecase.ProfessionalUseCase) *ProfessionalHandler
 }
 
 func (h *ProfessionalHandler) GetAll(c *gin.Context) {
-	professionals, err := h.uc.GetAll()
+	clerkID := c.GetString("userId")
+	professionals, err := h.uc.GetAll(clerkID)
 	if err != nil {
+		if errors.Is(err, usecase.ErrAddressRequired) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}

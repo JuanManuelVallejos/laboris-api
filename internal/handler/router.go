@@ -37,7 +37,6 @@ func NewRouter(ph *ProfessionalHandler, oh *OnboardingHandler, mh *MeHandler, rh
 	// Rutas públicas
 	pub := r.Group("/api/v1")
 	{
-		pub.GET("/professionals", ph.GetAll)
 		pub.GET("/professionals/:id", ph.GetByID)
 	}
 
@@ -45,9 +44,13 @@ func NewRouter(ph *ProfessionalHandler, oh *OnboardingHandler, mh *MeHandler, rh
 	priv := r.Group("/api/v1")
 	priv.Use(middleware.ClerkAuth())
 	{
+		// El listado ahora filtra por distancia al domicilio de quien
+		// pregunta, así que necesita saber quién es — dejó de ser público.
+		priv.GET("/professionals", ph.GetAll)
 		priv.POST("/onboarding", oh.Complete)
 		priv.GET("/me/professional", mh.GetMyProfessional)
 		priv.PUT("/me/professional", mh.UpdateMyProfessional)
+		priv.PUT("/me/address", mh.UpdateMyAddress)
 		priv.POST("/requests", rh.Create)
 		priv.GET("/me/requests/received", rh.ListReceived)
 		priv.GET("/me/requests/sent", rh.ListSent)

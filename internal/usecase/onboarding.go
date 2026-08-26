@@ -1,15 +1,21 @@
 package usecase
 
-import "github.com/laboris/laboris-api/internal/domain"
+import (
+	"context"
+
+	"github.com/laboris/laboris-api/internal/domain"
+	"github.com/laboris/laboris-api/internal/geocoding"
+)
 
 type OnboardingInput struct {
-	ClerkID  string
-	Email    string
-	FullName string
-	Role     string
-	Trade    string
-	Zone     string
-	Bio      string
+	ClerkID     string
+	Email       string
+	FullName    string
+	Role        string
+	Trade       string
+	HomeAddress string
+	RadiusKm    int
+	Bio         string
 }
 
 type OnboardingResult struct {
@@ -20,10 +26,11 @@ type OnboardingResult struct {
 type OnboardingUseCase struct {
 	users         domain.UserRepository
 	professionals domain.ProfessionalRepository
+	geo           *geocoding.Client
 }
 
-func NewOnboardingUseCase(u domain.UserRepository, p domain.ProfessionalRepository) *OnboardingUseCase {
-	return &OnboardingUseCase{users: u, professionals: p}
+func NewOnboardingUseCase(u domain.UserRepository, p domain.ProfessionalRepository, geo *geocoding.Client) *OnboardingUseCase {
+	return &OnboardingUseCase{users: u, professionals: p, geo: geo}
 }
 
 func (uc *OnboardingUseCase) Execute(in OnboardingInput) (*OnboardingResult, error) {
@@ -50,14 +57,27 @@ func (uc *OnboardingUseCase) Execute(in OnboardingInput) (*OnboardingResult, err
 		return nil, err
 	}
 
+	lat, lng, err := uc.geo.Geocode(context.Background(), in.HomeAddress)
+	if err != nil {
+		return nil, err
+	}
+
 	if in.Role == "professional" {
+		radiusKm := in.RadiusKm
 		_, err = uc.professionals.Create(&domain.Professional{
-			UserID: user.ID,
-			Trade:  in.Trade,
-			Zone:   in.Zone,
-			Bio:    in.Bio,
+			UserID:      user.ID,
+			Trade:       in.Trade,
+			HomeAddress: in.HomeAddress,
+			HomeLat:     &lat,
+			HomeLng:     &lng,
+			RadiusKm:    &radiusKm,
+			Bio:         in.Bio,
 		})
 		if err != nil {
+			return nil, err
+		}
+	} else {
+		if err := uc.users.UpdateHomeAddress(user.ID, in.HomeAddress, lat, lng); err != nil {
 			return nil, err
 		}
 	}

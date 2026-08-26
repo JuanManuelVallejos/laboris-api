@@ -16,6 +16,7 @@ type Config struct {
 	SupabaseURL            string
 	SupabaseServiceRoleKey string
 	SupabaseStorageBucket  string
+	GoogleMapsAPIKey       string
 }
 
 func Load() *Config {
@@ -47,5 +48,6 @@ func Load() *Config {
 		SupabaseURL:            os.Getenv("SUPABASE_URL"),
 		SupabaseServiceRoleKey: os.Getenv("SUPABASE_SERVICE_ROLE_KEY"),
 		SupabaseStorageBucket:  storageBucket,
+		GoogleMapsAPIKey:       os.Getenv("GOOGLE_MAPS_API_KEY"),
 	}
 }
