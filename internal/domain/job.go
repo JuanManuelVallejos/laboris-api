@@ -69,6 +69,15 @@ type Job struct {
 	ReworkRecords     []ReworkRecord `json:"reworkRecords"`
 	CreatedAt         time.Time      `json:"createdAt"`
 	UpdatedAt         time.Time      `json:"updatedAt"`
+	// ViewerIsClient / ViewerIsProfessional indican, para quien pidió este
+	// job, si es el cliente o el profesional — se completan al leer (mismo
+	// patrón que AutoCloseDeadline), no son columnas. Con doble rol, un
+	// usuario puede tener el rol "professional" en general y aun así ser el
+	// cliente de este job puntual, así que no alcanza con mirar sus roles
+	// globales. No usar en objetos que se difunden por el Hub de SSE — ahí
+	// el mismo job se comparte entre los dos participantes.
+	ViewerIsClient       bool `json:"viewerIsClient"`
+	ViewerIsProfessional bool `json:"viewerIsProfessional"`
 }
 
 type JobRepository interface {

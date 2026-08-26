@@ -74,6 +74,8 @@ func (uc *JobUseCase) GetByID(clerkID, jobID string) (*domain.Job, error) {
 		return nil, errors.New("forbidden")
 	}
 	applyAutoCloseDeadline(job, uc.autoCloseDays)
+	job.ViewerIsClient = user.ID == job.ClientID
+	job.ViewerIsProfessional = user.ID == job.ProfessionalUID
 	return job, nil
 }
 
