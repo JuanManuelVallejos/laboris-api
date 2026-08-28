@@ -44,7 +44,7 @@ func (uc *AddressUseCase) List(clerkID string) ([]domain.Address, error) {
 		return nil, err
 	}
 	if len(addrs) == 0 && user.HasHomeAddress() {
-		created, err := uc.addresses.Create(&domain.Address{
+		created, err := uc.addresses.CreateIfNotExists(&domain.Address{
 			UserID: user.ID, Label: "Casa", Address: user.HomeAddress,
 			Lat: *user.HomeLat, Lng: *user.HomeLng, IsDefault: true,
 		})

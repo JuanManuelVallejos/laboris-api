@@ -1,0 +1,1 @@
+ALTER TABLE addresses DROP CONSTRAINT addresses_user_address_unique;

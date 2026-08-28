@@ -72,6 +72,29 @@ func (r *AddressRepository) Create(a *domain.Address) (*domain.Address, error) {
 	return a, err
 }
 
+func (r *AddressRepository) CreateIfNotExists(a *domain.Address) (*domain.Address, error) {
+	err := r.db.QueryRow(context.Background(), `
+		INSERT INTO addresses (user_id, label, address, lat, lng, is_default)
+		VALUES ($1, $2, $3, $4, $5, $6)
+		ON CONFLICT (user_id, address) DO NOTHING
+		RETURNING id
+	`, a.UserID, a.Label, a.Address, a.Lat, a.Lng, a.IsDefault).Scan(&a.ID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		// Ya existía (otra llamada concurrente lo insertó primero) — se
+		// devuelve la fila existente en vez de duplicarla.
+		existing := &domain.Address{}
+		err := r.db.QueryRow(context.Background(), `
+			SELECT id, user_id, label, address, lat, lng, is_default
+			FROM addresses WHERE user_id = $1 AND address = $2
+		`, a.UserID, a.Address).Scan(&existing.ID, &existing.UserID, &existing.Label, &existing.Address, &existing.Lat, &existing.Lng, &existing.IsDefault)
+		return existing, err
+	}
+	if err != nil {
+		return nil, err
+	}
+	return a, nil
+}
+
 func (r *AddressRepository) Update(id, label, address string, lat, lng float64) (*domain.Address, error) {
 	a := &domain.Address{}
 	err := r.db.QueryRow(context.Background(), `
