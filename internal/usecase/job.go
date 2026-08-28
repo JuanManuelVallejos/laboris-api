@@ -76,6 +76,7 @@ func (uc *JobUseCase) GetByID(clerkID, jobID string) (*domain.Job, error) {
 	applyAutoCloseDeadline(job, uc.autoCloseDays)
 	job.ViewerIsClient = user.ID == job.ClientID
 	job.ViewerIsProfessional = user.ID == job.ProfessionalUID
+	applyJobAddressGating(job, job.ViewerIsClient)
 	return job, nil
 }
 
@@ -91,8 +92,21 @@ func (uc *JobUseCase) ListByUser(clerkID string) ([]domain.Job, error) {
 	}
 	for i := range jobs {
 		applyAutoCloseDeadline(&jobs[i], uc.autoCloseDays)
+		applyJobAddressGating(&jobs[i], jobs[i].ClientID == user.ID)
 	}
 	return jobs, nil
+}
+
+// applyJobAddressGating decide si Address queda completa o se recorta a lo
+// sumo a nivel localidad — el cliente siempre ve completo, el profesional
+// solo una vez confirmada la visita.
+func applyJobAddressGating(job *domain.Job, isClient bool) {
+	if isClient || domain.VisitConfirmed(job.Status) {
+		job.AddressRevealed = true
+		return
+	}
+	job.AddressRevealed = false
+	job.Address = domain.CoarsenAddress(job.Address)
 }
 
 // ScheduleVisit: pending_visit → visit_proposed (professional proposes a date, optionally with a quote)
@@ -121,6 +135,11 @@ func (uc *JobUseCase) ScheduleVisit(clerkID, jobID string, scheduledAt time.Time
 	if err != nil {
 		return nil, err
 	}
+	// El que llama es el profesional y visit_proposed todavía no está
+	// confirmado — su propia respuesta también queda con la dirección
+	// recortada (updateJob solo garantiza esto para la copia del Hub).
+	job.AddressRevealed = false
+	job.Address = domain.CoarsenAddress(job.Address)
 	msg := fmt.Sprintf("%s propuso una visita para el %s.", job.ProfessionalName, scheduledAt.Format("02/01 15:04"))
 	if quoteAmount != nil {
 		msg = fmt.Sprintf("%s propuso una visita para el %s, con un costo de $%.2f.", job.ProfessionalName, scheduledAt.Format("02/01 15:04"), *quoteAmount)
@@ -765,7 +784,15 @@ func (uc *JobUseCase) updateJob(job *domain.Job) (*domain.Job, error) {
 		return nil, err
 	}
 	if uc.hub != nil {
-		uc.hub.Publish(job.ID, job)
+		// El mismo objeto se comparte entre cliente y profesional (ver
+		// realtime.Hub) — no hay forma de mandar un Address distinto según
+		// quién lo reciba, así que la copia publicada siempre usa la
+		// versión más restrictiva. El frontend nunca confía en este campo
+		// al llegar por SSE; lo vuelve a pedir por REST cuando hace falta.
+		broadcast := *job
+		broadcast.Address = domain.CoarsenAddress(job.Address)
+		broadcast.AddressRevealed = false
+		uc.hub.Publish(broadcast.ID, &broadcast)
 	}
 	return job, nil
 }

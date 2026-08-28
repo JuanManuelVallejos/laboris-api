@@ -55,6 +55,7 @@ func NewRouter(ph *ProfessionalHandler, oh *OnboardingHandler, mh *MeHandler, rh
 		priv.GET("/me/requests/received", rh.ListReceived)
 		priv.GET("/me/requests/sent", rh.ListSent)
 		priv.GET("/requests/:id", rh.GetReceivedDetail)
+		priv.GET("/requests/:id/approx-location", rh.GetApproxLocation)
 		priv.PATCH("/requests/:id", rh.UpdateStatus)
 
 		if adh != nil {

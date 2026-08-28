@@ -45,6 +45,21 @@ func (uc *RequestUseCase) SetAutoCloseDays(days int) {
 
 var ErrSelfRequest = errors.New("no podés solicitar presupuesto a vos mismo")
 
+// ErrApproxLocationUnavailable se devuelve cuando la solicitud no tiene
+// coordenadas congeladas (legacy, creada antes de este sistema).
+var ErrApproxLocationUnavailable = errors.New("no hay una ubicación aproximada disponible para esta solicitud")
+
+// applyRequestAddressGating decide, para la vista del PROFESIONAL, si
+// Address queda completa o se recorta a lo sumo a nivel localidad.
+func applyRequestAddressGating(rq *domain.Request) {
+	if domain.VisitConfirmed(rq.JobStatus) {
+		rq.AddressRevealed = true
+		return
+	}
+	rq.AddressRevealed = false
+	rq.Address = domain.CoarsenAddress(rq.Address)
+}
+
 func (uc *RequestUseCase) Create(clerkID, professionalID, description, addressID string) (*domain.Request, error) {
 	user, err := uc.users.FindByClerkID(clerkID)
 	if err != nil {
@@ -59,6 +74,7 @@ func (uc *RequestUseCase) Create(clerkID, professionalID, description, addressID
 
 	var addrID *string
 	var addrSnapshot string
+	var addrLat, addrLng *float64
 	if uc.addresses != nil {
 		addr, err := uc.addresses.FindByID(addressID)
 		if err != nil {
@@ -68,10 +84,12 @@ func (uc *RequestUseCase) Create(clerkID, professionalID, description, addressID
 			return nil, ErrAddressNotFound
 		}
 		addrID = &addr.ID
-		// Se congela el texto tal cual está ahora — si el cliente después
-		// edita o borra este domicilio, esta solicitud (y el trabajo que
-		// salga de ella) no cambian.
+		// Se congela el texto y las coordenadas tal cual están ahora — si el
+		// cliente después edita o borra este domicilio, esta solicitud (y el
+		// trabajo que salga de ella) no cambian.
 		addrSnapshot = addr.Address
+		lat, lng := addr.Lat, addr.Lng
+		addrLat, addrLng = &lat, &lng
 	}
 
 	if uc.professionals != nil {
@@ -90,6 +108,8 @@ func (uc *RequestUseCase) Create(clerkID, professionalID, description, addressID
 		Description:    description,
 		AddressID:      addrID,
 		Address:        addrSnapshot,
+		AddressLat:     addrLat,
+		AddressLng:     addrLng,
 	})
 	if err != nil {
 		return nil, err
@@ -122,7 +142,14 @@ func (uc *RequestUseCase) ListReceivedByProfessional(clerkID string) ([]domain.R
 		return nil, errors.New("professional profile not found")
 	}
 	_, _ = AutoCloseOverdueJobs(uc.jobs, uc.notifications, uc.autoCloseDays)
-	return uc.requests.FindByProfessionalID(prof.ID)
+	reqs, err := uc.requests.FindByProfessionalID(prof.ID)
+	if err != nil {
+		return nil, err
+	}
+	for i := range reqs {
+		applyRequestAddressGating(&reqs[i])
+	}
+	return reqs, nil
 }
 
 // GetReceivedRequestDetail is how a professional opens a single request they
@@ -159,6 +186,7 @@ func (uc *RequestUseCase) GetReceivedRequestDetail(clerkID, requestID string) (*
 		}
 	}
 	signAttachments(uc.storage, rq.Photos)
+	applyRequestAddressGating(rq)
 	return rq, nil
 }
 
@@ -171,7 +199,14 @@ func (uc *RequestUseCase) ListSentByClient(clerkID string) ([]domain.Request, er
 		return nil, errors.New("user not found")
 	}
 	_, _ = AutoCloseOverdueJobs(uc.jobs, uc.notifications, uc.autoCloseDays)
-	return uc.requests.FindByClientID(user.ID)
+	reqs, err := uc.requests.FindByClientID(user.ID)
+	if err != nil {
+		return nil, err
+	}
+	for i := range reqs {
+		reqs[i].AddressRevealed = true // es su propio domicilio
+	}
+	return reqs, nil
 }
 
 func (uc *RequestUseCase) UpdateStatus(clerkID, id, status, reason string) (*domain.Request, error) {
@@ -242,4 +277,39 @@ func (uc *RequestUseCase) UpdateStatus(clerkID, id, status, reason string) (*dom
 	}
 
 	return rq, nil
+}
+
+// GetApproxLocation devuelve un punto jitterizado (nunca el real) alrededor
+// del domicilio congelado de una solicitud — para que el profesional pueda
+// ubicar la zona en el mapa antes de que la dirección exacta se revele.
+func (uc *RequestUseCase) GetApproxLocation(clerkID, requestID string) (lat, lng float64, err error) {
+	user, err := uc.users.FindByClerkID(clerkID)
+	if err != nil {
+		return 0, 0, err
+	}
+	if user == nil {
+		return 0, 0, ErrUserNotOnboarded
+	}
+	prof, err := uc.professionals.FindByUserID(user.ID)
+	if err != nil {
+		return 0, 0, err
+	}
+	if prof == nil {
+		return 0, 0, errors.New("professional profile not found")
+	}
+	rq, err := uc.requests.FindByID(requestID)
+	if err != nil {
+		return 0, 0, err
+	}
+	if rq == nil {
+		return 0, 0, errors.New("request not found")
+	}
+	if rq.ProfessionalID != prof.ID {
+		return 0, 0, errors.New("forbidden")
+	}
+	if rq.AddressLat == nil || rq.AddressLng == nil {
+		return 0, 0, ErrApproxLocationUnavailable
+	}
+	lat, lng = domain.JitterCoords(*rq.AddressLat, *rq.AddressLng, rq.ID, 150)
+	return lat, lng, nil
 }

@@ -19,10 +19,23 @@ type Request struct {
 	// AddressID es el domicilio guardado elegido al pedir el presupuesto —
 	// nil en solicitudes viejas, creadas antes de este sistema (legacy).
 	AddressID *string `json:"-"`
-	// Address es el texto del domicilio (join contra addresses) — se lo
-	// mostramos al profesional para que pueda evaluar la zona antes de
-	// aceptar. Vacío en solicitudes legacy sin address_id.
-	Address         string       `json:"address,omitempty"`
+	// AddressLat/AddressLng son las coordenadas congeladas al momento de
+	// crear la solicitud (mismo criterio que Address) — se usan para el
+	// círculo aproximado que ve el profesional antes de que se revele la
+	// dirección exacta. nil en solicitudes legacy sin coords congeladas.
+	AddressLat *float64 `json:"-"`
+	AddressLng *float64 `json:"-"`
+	// Address es el texto del domicilio — completo si ya se reveló
+	// (AddressRevealed), o recortado a lo sumo a nivel localidad si no.
+	// Vacío en solicitudes legacy sin address_id.
+	Address string `json:"address,omitempty"`
+	// AddressRevealed indica si Address trae el domicilio completo. Para el
+	// cliente siempre es true (es su propio domicilio); para el profesional
+	// depende del estado del trabajo asociado — ver RequestUseCase.
+	AddressRevealed bool `json:"addressRevealed"`
+	// JobStatus es el status del job asociado (si existe) — interno, se usa
+	// solo para decidir el gating de arriba, nunca se expone.
+	JobStatus       string       `json:"-"`
 	Description     string       `json:"description"`
 	Status          string       `json:"status"`
 	RejectionReason string       `json:"rejectionReason"`

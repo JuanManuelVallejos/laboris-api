@@ -20,10 +20,10 @@ func NewRequestRepository(db *pgxpool.Pool) *RequestRepository {
 
 func (r *RequestRepository) Create(req *domain.Request) (*domain.Request, error) {
 	err := r.db.QueryRow(context.Background(), `
-		INSERT INTO requests (client_id, professional_id, description, address_id, address_snapshot)
-		VALUES ($1, $2, $3, $4, NULLIF($5, ''))
+		INSERT INTO requests (client_id, professional_id, description, address_id, address_snapshot, address_lat, address_lng)
+		VALUES ($1, $2, $3, $4, NULLIF($5, ''), $6, $7)
 		RETURNING id, client_id, professional_id, description, status, COALESCE(rejection_reason,''), address_id, COALESCE(address_snapshot,''), created_at
-	`, req.ClientID, req.ProfessionalID, req.Description, req.AddressID, req.Address,
+	`, req.ClientID, req.ProfessionalID, req.Description, req.AddressID, req.Address, req.AddressLat, req.AddressLng,
 	).Scan(&req.ID, &req.ClientID, &req.ProfessionalID, &req.Description, &req.Status, &req.RejectionReason, &req.AddressID, &req.Address, &req.CreatedAt)
 	if err != nil {
 		var pgErr *pgconn.PgError
@@ -49,7 +49,7 @@ func (r *RequestRepository) FindByID(id string) (*domain.Request, error) {
 	err := r.db.QueryRow(context.Background(), `
 		SELECT rq.id, rq.client_id, uc.full_name, rq.professional_id, up.full_name,
 		       rq.description, rq.status, COALESCE(rq.rejection_reason,''), COALESCE(j.id::text,''),
-		       COALESCE(rq.address_snapshot,''), rq.created_at
+		       COALESCE(rq.address_snapshot,''), COALESCE(j.status,''), rq.address_lat, rq.address_lng, rq.created_at
 		FROM requests rq
 		JOIN users uc ON uc.id = rq.client_id
 		JOIN professionals p ON p.id = rq.professional_id
@@ -57,7 +57,7 @@ func (r *RequestRepository) FindByID(id string) (*domain.Request, error) {
 		LEFT JOIN jobs j ON j.request_id = rq.id
 		WHERE rq.id = $1
 	`, id).Scan(&rq.ID, &rq.ClientID, &rq.ClientName, &rq.ProfessionalID, &rq.ProfessionalName,
-		&rq.Description, &rq.Status, &rq.RejectionReason, &rq.JobID, &rq.Address, &rq.CreatedAt)
+		&rq.Description, &rq.Status, &rq.RejectionReason, &rq.JobID, &rq.Address, &rq.JobStatus, &rq.AddressLat, &rq.AddressLng, &rq.CreatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -99,7 +99,7 @@ func (r *RequestRepository) FindByProfessionalID(professionalID string) ([]domai
 	rows, err := r.db.Query(context.Background(), `
 		SELECT rq.id, rq.client_id, uc.full_name, rq.professional_id, up.full_name,
 		       rq.description, rq.status, COALESCE(rq.rejection_reason,''), COALESCE(j.id::text,''),
-		       COALESCE(rq.address_snapshot,''), rq.created_at
+		       COALESCE(rq.address_snapshot,''), COALESCE(j.status,''), rq.created_at
 		FROM requests rq
 		JOIN users uc ON uc.id = rq.client_id
 		JOIN professionals p ON p.id = rq.professional_id
@@ -117,7 +117,7 @@ func (r *RequestRepository) FindByProfessionalID(professionalID string) ([]domai
 	for rows.Next() {
 		var rq domain.Request
 		if err := rows.Scan(&rq.ID, &rq.ClientID, &rq.ClientName, &rq.ProfessionalID, &rq.ProfessionalName,
-			&rq.Description, &rq.Status, &rq.RejectionReason, &rq.JobID, &rq.Address, &rq.CreatedAt); err != nil {
+			&rq.Description, &rq.Status, &rq.RejectionReason, &rq.JobID, &rq.Address, &rq.JobStatus, &rq.CreatedAt); err != nil {
 			return nil, err
 		}
 		result = append(result, rq)
@@ -129,7 +129,7 @@ func (r *RequestRepository) FindByClientID(clientID string) ([]domain.Request, e
 	rows, err := r.db.Query(context.Background(), `
 		SELECT rq.id, rq.client_id, uc.full_name, rq.professional_id, up.full_name,
 		       rq.description, rq.status, COALESCE(rq.rejection_reason,''), COALESCE(j.id::text,''),
-		       COALESCE(rq.address_snapshot,''), rq.created_at
+		       COALESCE(rq.address_snapshot,''), COALESCE(j.status,''), rq.created_at
 		FROM requests rq
 		JOIN users uc ON uc.id = rq.client_id
 		JOIN professionals p ON p.id = rq.professional_id
@@ -147,7 +147,7 @@ func (r *RequestRepository) FindByClientID(clientID string) ([]domain.Request, e
 	for rows.Next() {
 		var rq domain.Request
 		if err := rows.Scan(&rq.ID, &rq.ClientID, &rq.ClientName, &rq.ProfessionalID, &rq.ProfessionalName,
-			&rq.Description, &rq.Status, &rq.RejectionReason, &rq.JobID, &rq.Address, &rq.CreatedAt); err != nil {
+			&rq.Description, &rq.Status, &rq.RejectionReason, &rq.JobID, &rq.Address, &rq.JobStatus, &rq.CreatedAt); err != nil {
 			return nil, err
 		}
 		result = append(result, rq)

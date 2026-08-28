@@ -21,6 +21,22 @@ const (
 	JobStatusCancelled           = "cancelled"
 )
 
+// VisitConfirmed indica si, para este status, ya corresponde revelarle al
+// profesional la dirección exacta del trabajo — recién una vez que el
+// cliente confirmó una visita propuesta (con o sin cotización), o el
+// trabajo se saltó la visita directamente. Antes de eso (sin trabajo
+// todavía, o con una visita solo propuesta sin confirmar) se mantiene
+// oculta. Ninguna transición vuelve a pending_visit/visit_proposed desde un
+// estado posterior, así que el reveal es permanente para ese trabajo.
+func VisitConfirmed(status string) bool {
+	switch status {
+	case "", JobStatusPendingVisit, JobStatusVisitProposed:
+		return false
+	default:
+		return true
+	}
+}
+
 // ValidTransitions defines allowed state transitions for a Job.
 var ValidTransitions = map[string]map[string]bool{
 	JobStatusPendingVisit:        {JobStatusVisitProposed: true, JobStatusWorkQuoted: true, JobStatusCancelled: true},
@@ -51,8 +67,15 @@ type Job struct {
 	ProfessionalUID  string `json:"-"` // professional's user_id — used for auth, not exposed
 	// Address es el domicilio congelado al momento de crear la solicitud
 	// (requests.address_snapshot) — no cambia aunque el cliente después
-	// edite o borre ese domicilio guardado. Vacío en trabajos legacy.
-	Address           string     `json:"address,omitempty"`
+	// edite o borre ese domicilio guardado. Vacío en trabajos legacy. Para
+	// el profesional queda recortado a lo sumo a nivel localidad hasta que
+	// AddressRevealed sea true.
+	Address string `json:"address,omitempty"`
+	// AddressRevealed indica si Address trae el domicilio completo. Para el
+	// cliente siempre es true; para el profesional, solo una vez confirmada
+	// la visita (VisitConfirmed). Los objetos que se difunden por el Hub de
+	// SSE siempre lo fuerzan a false — ver JobUseCase.updateJob.
+	AddressRevealed   bool       `json:"addressRevealed"`
 	Status            string     `json:"status"`
 	VisitScheduledAt  *time.Time `json:"visitScheduledAt,omitempty"`
 	VisitQuoteAmount  *float64   `json:"visitQuoteAmount,omitempty"`

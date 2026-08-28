@@ -71,6 +71,16 @@ func (h *RequestHandler) GetReceivedDetail(c *gin.Context) {
 	c.JSON(http.StatusOK, r)
 }
 
+func (h *RequestHandler) GetApproxLocation(c *gin.Context) {
+	clerkID := c.GetString("userId")
+	lat, lng, err := h.uc.GetApproxLocation(clerkID, c.Param("id"))
+	if err != nil {
+		c.JSON(httpStatus(err), gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"lat": lat, "lng": lng})
+}
+
 type updateStatusBody struct {
 	Status string `json:"status"          binding:"required,oneof=accepted rejected"`
 	Reason string `json:"rejectionReason"`
