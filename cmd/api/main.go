@@ -39,6 +39,7 @@ func main() {
 	var atth *handler.AttachmentHandler
 	var wh *handler.ClerkWebhookHandler
 	var adh *handler.AddressHandler
+	var rvh *handler.ReviewHandler
 	var pool *pgxpool.Pool
 
 	if cfg.DatabaseURL != "" {
@@ -63,6 +64,7 @@ func main() {
 		reworkRepo := repopostgres.NewReworkRecordRepository(pool)
 		attachmentRepo := repopostgres.NewAttachmentRepository(pool)
 		addressRepo := repopostgres.NewAddressRepository(pool)
+		reviewRepo := repopostgres.NewReviewRepository(pool)
 
 		messageHub := realtime.NewHub[*domain.Message]()
 		notificationHub := realtime.NewHub[*domain.Notification]()
@@ -98,6 +100,7 @@ func main() {
 		jh = handler.NewJobHandler(jobUC, msgUC, sseConnLimiter)
 		atth = handler.NewAttachmentHandler(attachmentUC)
 		adh = handler.NewAddressHandler(usecase.NewAddressUseCase(addressRepo, userRepo, geoClient))
+		rvh = handler.NewReviewHandler(usecase.NewReviewUseCase(reviewRepo, userRepo, profRepo, jobRepo))
 		if cfg.ClerkWebhookSecret != "" {
 			wh = handler.NewClerkWebhookHandler(usecase.NewUserSyncUseCase(userRepo), cfg.ClerkWebhookSecret)
 		}
@@ -113,7 +116,7 @@ func main() {
 		log.Println("using in-memory repository (no DATABASE_URL set)")
 	}
 
-	r := handler.NewRouter(ph, oh, mh, rh, nh, ah, jh, atth, wh, adh, pool)
+	r := handler.NewRouter(ph, oh, mh, rh, nh, ah, jh, atth, wh, adh, rvh, pool)
 
 	// WriteTimeout deliberately left unset: it's the only timeout that would
 	// cut off long-lived SSE streams (job/message/notification updates),

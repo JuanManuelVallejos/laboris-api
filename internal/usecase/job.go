@@ -97,6 +97,39 @@ func (uc *JobUseCase) ListByUser(clerkID string) ([]domain.Job, error) {
 	return jobs, nil
 }
 
+// ProfessionalStats resume la actividad de un profesional para la pestaña
+// "Mi actividad": cuántos trabajos completó y cuánto ganó, mes a mes.
+type ProfessionalStats struct {
+	TotalCompleted  int                     `json:"totalCompleted"`
+	TotalEarned     float64                 `json:"totalEarned"`
+	MonthlyEarnings []domain.MonthlyEarning `json:"monthlyEarnings"`
+}
+
+func (uc *JobUseCase) GetProfessionalStats(clerkID string) (*ProfessionalStats, error) {
+	_, prof, err := uc.resolveUser(clerkID)
+	if err != nil {
+		return nil, err
+	}
+	if prof == nil {
+		return nil, errors.New("professional profile not found")
+	}
+
+	completed, err := uc.jobs.CountCompletedByProfessional(prof.ID)
+	if err != nil {
+		return nil, err
+	}
+	monthly, err := uc.payments.MonthlyEarningsByProfessional(prof.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	stats := &ProfessionalStats{TotalCompleted: completed, MonthlyEarnings: monthly}
+	for _, m := range monthly {
+		stats.TotalEarned += m.Amount
+	}
+	return stats, nil
+}
+
 // applyJobAddressGating decide si Address queda completa o se recorta a lo
 // sumo a nivel localidad — el cliente siempre ve completo, el profesional
 // solo una vez confirmada la visita.

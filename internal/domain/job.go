@@ -114,4 +114,7 @@ type JobRepository interface {
 	FindByRequestID(requestID string) (*Job, error)
 	FindOverdueDelivered(before time.Time) ([]Job, error)
 	Update(j *Job) (*Job, error)
+	// CountCompletedByProfessional se usa para las estadísticas de "Mi
+	// actividad" — cuántos trabajos completó este profesional en total.
+	CountCompletedByProfessional(professionalID string) (int, error)
 }

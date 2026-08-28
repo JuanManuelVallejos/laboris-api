@@ -60,6 +60,16 @@ func (h *JobHandler) ListMyJobs(c *gin.Context) {
 	c.JSON(http.StatusOK, jobs)
 }
 
+func (h *JobHandler) GetMyStats(c *gin.Context) {
+	clerkID := c.GetString("userId")
+	stats, err := h.uc.GetProfessionalStats(clerkID)
+	if err != nil {
+		c.JSON(httpStatus(err), gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, stats)
+}
+
 type scheduleVisitBody struct {
 	ScheduledAt time.Time `json:"scheduledAt" binding:"required"`
 	QuoteAmount *float64  `json:"quoteAmount"`

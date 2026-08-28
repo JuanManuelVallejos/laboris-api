@@ -28,4 +28,16 @@ type PaymentRepository interface {
 	Create(p *Payment) (*Payment, error)
 	FindByJobID(jobID string) ([]Payment, error)
 	UpdateStatus(id, status string) error
+	// MonthlyEarningsByProfessional agrupa por mes (más reciente primero) el
+	// dinero ya cobrado (paid/released) de los trabajos de este profesional
+	// — se usa en las estadísticas de "Mi actividad".
+	MonthlyEarningsByProfessional(professionalID string) ([]MonthlyEarning, error)
+}
+
+// MonthlyEarning es un renglón de "cuánto gané en tal mes" — Month va en
+// formato "2026-08" (el frontend se encarga de darle formato legible).
+type MonthlyEarning struct {
+	Month     string  `json:"month"`
+	Amount    float64 `json:"amount"`
+	JobsCount int     `json:"jobsCount"`
 }

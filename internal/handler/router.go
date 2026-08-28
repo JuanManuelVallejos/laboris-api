@@ -9,7 +9,7 @@ import (
 	"github.com/laboris/laboris-api/internal/middleware"
 )
 
-func NewRouter(ph *ProfessionalHandler, oh *OnboardingHandler, mh *MeHandler, rh *RequestHandler, nh *NotificationHandler, ah *AdminHandler, jh *JobHandler, atth *AttachmentHandler, wh *ClerkWebhookHandler, adh *AddressHandler, db *pgxpool.Pool) *gin.Engine {
+func NewRouter(ph *ProfessionalHandler, oh *OnboardingHandler, mh *MeHandler, rh *RequestHandler, nh *NotificationHandler, ah *AdminHandler, jh *JobHandler, atth *AttachmentHandler, wh *ClerkWebhookHandler, adh *AddressHandler, rvh *ReviewHandler, db *pgxpool.Pool) *gin.Engine {
 	r := gin.Default()
 
 	r.Use(cors.New(cors.Config{
@@ -38,6 +38,9 @@ func NewRouter(ph *ProfessionalHandler, oh *OnboardingHandler, mh *MeHandler, rh
 	pub := r.Group("/api/v1")
 	{
 		pub.GET("/professionals/:id", ph.GetByID)
+		if rvh != nil {
+			pub.GET("/professionals/:id/reviews", rvh.ListByProfessional)
+		}
 	}
 
 	// Rutas protegidas — requieren JWT válido de Clerk
@@ -48,6 +51,9 @@ func NewRouter(ph *ProfessionalHandler, oh *OnboardingHandler, mh *MeHandler, rh
 		// pregunta, así que necesita saber quién es — dejó de ser público.
 		priv.GET("/professionals", ph.GetAll)
 		priv.GET("/professionals/:id/address-check", ph.CheckAddressDistance)
+		if rvh != nil {
+			priv.POST("/professionals/:id/reviews", rvh.Create)
+		}
 		priv.POST("/onboarding", oh.Complete)
 		priv.GET("/me/professional", mh.GetMyProfessional)
 		priv.PUT("/me/professional", mh.UpdateMyProfessional)
@@ -81,6 +87,7 @@ func NewRouter(ph *ProfessionalHandler, oh *OnboardingHandler, mh *MeHandler, rh
 
 		if jh != nil {
 			priv.GET("/me/jobs", jh.ListMyJobs)
+			priv.GET("/me/professional/stats", jh.GetMyStats)
 			priv.GET("/jobs/:id", jh.GetJob)
 			priv.GET("/jobs/:id/stream", jh.StreamJob)
 			priv.PATCH("/jobs/:id/schedule-visit", jh.ScheduleVisit)
