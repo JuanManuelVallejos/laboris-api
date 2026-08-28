@@ -117,4 +117,6 @@ type JobRepository interface {
 	// CountCompletedByProfessional se usa para las estadísticas de "Mi
 	// actividad" — cuántos trabajos completó este profesional en total.
 	CountCompletedByProfessional(professionalID string) (int, error)
+	// CountCompletedByClient es el equivalente para "Mi actividad" del cliente.
+	CountCompletedByClient(clientID string) (int, error)
 }

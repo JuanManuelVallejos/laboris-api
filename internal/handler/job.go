@@ -70,6 +70,16 @@ func (h *JobHandler) GetMyStats(c *gin.Context) {
 	c.JSON(http.StatusOK, stats)
 }
 
+func (h *JobHandler) GetMyClientStats(c *gin.Context) {
+	clerkID := c.GetString("userId")
+	stats, err := h.uc.GetClientStats(clerkID)
+	if err != nil {
+		c.JSON(httpStatus(err), gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, stats)
+}
+
 type scheduleVisitBody struct {
 	ScheduledAt time.Time `json:"scheduledAt" binding:"required"`
 	QuoteAmount *float64  `json:"quoteAmount"`

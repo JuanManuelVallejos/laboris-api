@@ -88,6 +88,7 @@ func NewRouter(ph *ProfessionalHandler, oh *OnboardingHandler, mh *MeHandler, rh
 		if jh != nil {
 			priv.GET("/me/jobs", jh.ListMyJobs)
 			priv.GET("/me/professional/stats", jh.GetMyStats)
+			priv.GET("/me/client/stats", jh.GetMyClientStats)
 			priv.GET("/jobs/:id", jh.GetJob)
 			priv.GET("/jobs/:id/stream", jh.StreamJob)
 			priv.PATCH("/jobs/:id/schedule-visit", jh.ScheduleVisit)

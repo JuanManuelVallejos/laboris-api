@@ -32,6 +32,9 @@ type PaymentRepository interface {
 	// dinero ya cobrado (paid/released) de los trabajos de este profesional
 	// — se usa en las estadísticas de "Mi actividad".
 	MonthlyEarningsByProfessional(professionalID string) ([]MonthlyEarning, error)
+	// MonthlySpendingByClient es el equivalente para "Mi actividad" del cliente:
+	// cuánto pagó (paid/released) este cliente, agrupado por mes.
+	MonthlySpendingByClient(clientID string) ([]MonthlyEarning, error)
 }
 
 // MonthlyEarning es un renglón de "cuánto gané en tal mes" — Month va en

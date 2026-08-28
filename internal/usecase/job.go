@@ -130,6 +130,36 @@ func (uc *JobUseCase) GetProfessionalStats(clerkID string) (*ProfessionalStats, 
 	return stats, nil
 }
 
+// ClientStats es el equivalente de ProfessionalStats para la pestaña "Mi
+// actividad" del cliente: cuántos trabajos completó y cuánto gastó, mes a mes.
+type ClientStats struct {
+	TotalCompleted  int                     `json:"totalCompleted"`
+	TotalSpent      float64                 `json:"totalSpent"`
+	MonthlySpending []domain.MonthlyEarning `json:"monthlySpending"`
+}
+
+func (uc *JobUseCase) GetClientStats(clerkID string) (*ClientStats, error) {
+	user, _, err := uc.resolveUser(clerkID)
+	if err != nil {
+		return nil, err
+	}
+
+	completed, err := uc.jobs.CountCompletedByClient(user.ID)
+	if err != nil {
+		return nil, err
+	}
+	monthly, err := uc.payments.MonthlySpendingByClient(user.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	stats := &ClientStats{TotalCompleted: completed, MonthlySpending: monthly}
+	for _, m := range monthly {
+		stats.TotalSpent += m.Amount
+	}
+	return stats, nil
+}
+
 // applyJobAddressGating decide si Address queda completa o se recorta a lo
 // sumo a nivel localidad — el cliente siempre ve completo, el profesional
 // solo una vez confirmada la visita.

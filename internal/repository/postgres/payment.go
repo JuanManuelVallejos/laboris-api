@@ -81,3 +81,30 @@ func (r *PaymentRepository) MonthlyEarningsByProfessional(professionalID string)
 	}
 	return result, nil
 }
+
+func (r *PaymentRepository) MonthlySpendingByClient(clientID string) ([]domain.MonthlyEarning, error) {
+	rows, err := r.db.Query(context.Background(), `
+		SELECT to_char(p.created_at, 'YYYY-MM') AS month,
+		       SUM(p.amount) AS amount,
+		       COUNT(DISTINCT p.job_id) AS jobs_count
+		FROM payments p
+		JOIN jobs j ON j.id = p.job_id
+		WHERE j.client_id = $1 AND p.status IN ($2, $3)
+		GROUP BY month
+		ORDER BY month DESC
+	`, clientID, domain.PaymentStatusPaid, domain.PaymentStatusReleased)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	result := make([]domain.MonthlyEarning, 0)
+	for rows.Next() {
+		var m domain.MonthlyEarning
+		if err := rows.Scan(&m.Month, &m.Amount, &m.JobsCount); err != nil {
+			return nil, err
+		}
+		result = append(result, m)
+	}
+	return result, nil
+}

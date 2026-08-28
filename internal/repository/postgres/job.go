@@ -241,6 +241,15 @@ func (r *JobRepository) CountCompletedByProfessional(professionalID string) (int
 	return count, err
 }
 
+func (r *JobRepository) CountCompletedByClient(clientID string) (int, error) {
+	var count int
+	err := r.db.QueryRow(context.Background(),
+		`SELECT COUNT(*) FROM jobs WHERE client_id = $1 AND status = $2`,
+		clientID, domain.JobStatusCompleted,
+	).Scan(&count)
+	return count, err
+}
+
 func (r *JobRepository) fetchPayments(jobID string) ([]domain.Payment, error) {
 	rows, err := r.db.Query(context.Background(), `
 		SELECT id, job_id, type, amount, status, provider, COALESCE(provider_ref,''), created_at, updated_at
